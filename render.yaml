@@ -1,0 +1,25 @@
+# Render Blueprint — GT / OS internal CRM
+# Native Node runtime (with Bun toolkit), no Docker. Starter plan stays always-on
+# (no cold starts) which matters for an internal tool people open sporadically.
+services:
+  - type: web
+    name: gt-os
+    runtime: node
+    plan: starter
+    region: frankfurt # pick the region closest to your team / Supabase project
+    buildCommand: bun install && bun run build
+    startCommand: bun run start
+    autoDeploy: true
+    healthCheckPath: /login
+    envVars:
+      - key: BUN_VERSION
+        value: "1.3.14"
+      - key: NODE_VERSION
+        value: "22"
+      # Set these as secrets in the Render dashboard (sync:false keeps them out of git):
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
