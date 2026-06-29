@@ -10,7 +10,7 @@ lost-deal analysis, and a founder scorecard — built for GT employees only.
 | Frontend | Next.js 16 (App Router, TS strict) | Server components + the existing GT/OS design |
 | Backend | **Supabase only** — no FastAPI | Postgres + auto API + RLS + Auth cover everything at this scale |
 | Data API | PostgREST (auto) + Postgres views/RPCs | CRUD is free; scorecard aggregations are SQL views |
-| Auth | Supabase Auth + Google Workspace SSO | Everyone has a Google account; domain-restricted to GT-HQ |
+| Auth | Supabase Auth — email magic links | No external OAuth setup; domain-restricted to GT-HQ (Google SSO can be added later) |
 | AuthZ | Row Level Security + JWT role claim | `manager` sees all, `rep` sees own — enforced in the DB |
 | Runtime | Bun | Org standard |
 | Deploy | Render native Node web service (no Docker) | Render runs Next.js + Bun natively; simpler to maintain |
@@ -35,14 +35,15 @@ bun run dev                  # http://localhost:3000
 3. Load the seed data (294 deals + 3,653 contacts from the original export):
    - regenerate it with `bun run scripts/extract-seed.mjs` (reads the prototype HTML), then
    - run `supabase/seed/seed.sql` in the SQL Editor.
-4. **Authentication → Providers → Google**: enable it and paste your Google OAuth
-   client ID + secret. In Google Cloud Console the **authorized redirect URI must be
-   Supabase's** callback: `https://<project-ref>.supabase.co/auth/v1/callback`
-   (Supabase handles the OAuth dance, then bounces back to the app).
-   Then under **Authentication → URL Configuration**, set the Site URL and add
-   `https://<your-app>/auth/callback` (and `http://localhost:3000/auth/callback`
-   for dev) to the **Redirect URLs** allowlist.
-5. **Authentication → Hooks**:
+4. **Sign-in = email magic links** (no external OAuth setup). Supabase's Email
+   provider is on by default — nothing to configure there. Under
+   **Authentication → URL Configuration**, set the Site URL and add
+   `https://<your-app>/auth/callback` and `http://localhost:3000/auth/callback`
+   to the **Redirect URLs** allowlist.
+   *(Google Workspace SSO can be added later — the `/auth/callback` route already
+   handles the OAuth `code` flow. For production email volume, set custom SMTP
+   under Authentication → Emails; the built-in sender is rate-limited.)*
+5. **Authentication → Hooks** (this is what enforces internal-only + roles):
    - *Before user created* → `hook_restrict_signup_by_email_domain` (locks sign-in to `gt-hq.com`)
    - *Custom access token* → `custom_access_token_hook` (puts the role in the JWT)
 6. Change the allowed domain anytime: edit `public.signup_email_domains`.

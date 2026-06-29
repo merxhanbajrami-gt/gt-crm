@@ -1,34 +1,40 @@
 import { NextResponse } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
-// OAuth / magic-link callback. Exchanges the code for a session cookie, then
-// sends the user into the app.
+// Auth callback for magic links (and OAuth, if enabled later).
+// Handles both delivery shapes: a PKCE `code`, or an OTP `token_hash` + `type`.
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  // Only allow same-origin relative paths to prevent open-redirect abuse.
-  // Rejects absolute URLs, protocol-relative (//evil.com), and backslash tricks.
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type") as EmailOtpType | null;
+  const error =
+    searchParams.get("error_description") ?? searchParams.get("error");
+
+  // Only allow same-origin relative redirects (prevents open-redirect abuse).
   const rawNext = searchParams.get("next") ?? "/";
   const next = /^\/(?!\/)[^\\]*$/.test(rawNext) ? rawNext : "/";
-  const error = searchParams.get("error_description") ?? searchParams.get("error");
 
-  if (error) {
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(error)}`,
-    );
-  }
+  const fail = (msg: string) =>
+    NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`);
+
+  if (error) return fail(error);
+
+  const supabase = await createClient();
 
   if (code) {
-    const supabase = await createClient();
-    const { error: exchangeError } =
-      await supabase.auth.exchangeCodeForSession(code);
-    if (!exchangeError) {
-      return NextResponse.redirect(new URL(next, origin));
-    }
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(exchangeError.message)}`,
-    );
+    const { error: e } = await supabase.auth.exchangeCodeForSession(code);
+    return e ? fail(e.message) : NextResponse.redirect(new URL(next, origin));
   }
 
-  return NextResponse.redirect(`${origin}/login?error=missing_code`);
+  if (tokenHash && type) {
+    const { error: e } = await supabase.auth.verifyOtp({
+      type,
+      token_hash: tokenHash,
+    });
+    return e ? fail(e.message) : NextResponse.redirect(new URL(next, origin));
+  }
+
+  return fail("missing_auth_params");
 }
