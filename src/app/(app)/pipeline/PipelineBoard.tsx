@@ -10,12 +10,10 @@ export default function PipelineBoard({
   stages,
   deals: initialDeals,
   owners,
-  canEdit,
 }: {
   stages: Stage[];
   deals: Deal[];
   owners: [string, string][];
-  canEdit: boolean;
 }) {
   const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
@@ -120,7 +118,6 @@ export default function PipelineBoard({
               data-stage={s.id}
               style={{ ["--kc" as string]: s.color ?? "#7B7AE6" }}
               onDragOver={(e) => {
-                if (!canEdit) return;
                 e.preventDefault();
                 (e.currentTarget as HTMLElement).classList.add("dragover");
               }}
@@ -129,7 +126,7 @@ export default function PipelineBoard({
               }
               onDrop={(e) => {
                 (e.currentTarget as HTMLElement).classList.remove("dragover");
-                if (canEdit && dragId) restage(dragId, s.id);
+                if (dragId) restage(dragId, s.id);
                 setDragId(null);
               }}
             >
@@ -150,7 +147,7 @@ export default function PipelineBoard({
                     <div
                       key={d.id}
                       className={`kcard${ac ? " age-" + ac : ""}`}
-                      draggable={canEdit}
+                      draggable
                       onDragStart={() => setDragId(d.id)}
                       onDragEnd={() => setDragId(null)}
                     >

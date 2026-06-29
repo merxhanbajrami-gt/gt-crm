@@ -3,12 +3,11 @@
 import { useMemo, useState } from "react";
 import type { Contact } from "@/lib/types";
 
-type SortKey = "name" | "dealname" | "vertical" | "stage" | "owner_code";
-type Filter = "all" | "hot" | "active" | "won" | "lost";
+type SortKey = "name" | "dealname" | "stage" | "owner_code";
+type Filter = "all" | "active" | "won" | "lost";
 
 const FILTERS: { f: Filter; label: string }[] = [
   { f: "all", label: "All" },
-  { f: "hot", label: "Hot" },
   { f: "active", label: "Active" },
   { f: "won", label: "Customers" },
   { f: "lost", label: "Lost" },
@@ -23,7 +22,6 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
     let out = contacts.filter((c) => {
-      if (filter === "hot" && !c.hot) return false;
       if (filter === "won" && c.stage !== "won") return false;
       if (filter === "lost" && c.stage !== "lost") return false;
       if (
@@ -32,7 +30,7 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
       )
         return false;
       if (!term) return true;
-      return [c.name, c.dealname, c.vertical, c.email, c.owner_code]
+      return [c.name, c.dealname, c.title, c.email, c.owner_code]
         .join(" ")
         .toLowerCase()
         .includes(term);
@@ -53,8 +51,7 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
     }
   }
 
-  const arrow = (k: SortKey) =>
-    sortKey === k ? (asc ? " ▲" : " ▼") : "";
+  const arrow = (k: SortKey) => (sortKey === k ? (asc ? " ▲" : " ▼") : "");
 
   return (
     <>
@@ -64,7 +61,7 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search contacts, companies, verticals"
+          placeholder="Search contacts, companies, titles, owners"
         />
         {FILTERS.map(({ f, label }) => (
           <button
@@ -84,9 +81,6 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
               <th onClick={() => sortBy("dealname")}>
                 Company / Deal{arrow("dealname")}
               </th>
-              <th onClick={() => sortBy("vertical")}>
-                Vertical{arrow("vertical")}
-              </th>
               <th onClick={() => sortBy("stage")}>Stage{arrow("stage")}</th>
               <th>Email</th>
               <th onClick={() => sortBy("owner_code")}>
@@ -98,16 +92,15 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
             {rows.slice(0, 500).map((c) => (
               <tr key={c.id}>
                 <td>
-                  {c.hot && (
-                    <span
-                      className="actiondot"
-                      style={{ background: "var(--amber)", marginRight: 6 }}
-                    />
-                  )}
-                  {c.name} {c.title ? <span className="muted">· {c.title}</span> : null}
+                  {c.name}
+                  {c.title ? (
+                    <span style={{ color: "var(--text-faint)" }}>
+                      {" "}
+                      · {c.title}
+                    </span>
+                  ) : null}
                 </td>
                 <td>{c.dealname || "—"}</td>
-                <td>{c.vertical || "—"}</td>
                 <td>{c.stage || "—"}</td>
                 <td>{c.email || "—"}</td>
                 <td>{c.owner_code || "—"}</td>

@@ -17,7 +17,7 @@ export default async function ContactsPage() {
       <h1 className="view-title">Contacts</h1>
       <p className="view-sub">
         {(data ?? []).length.toLocaleString()} contacts. Search across name,
-        company, and vertical. Sort by any column.
+        company, title, and owner. Sort by any column.
       </p>
       <ContactsTable contacts={(data ?? []) as Contact[]} />
     </section>

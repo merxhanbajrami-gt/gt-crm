@@ -1,11 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { getSessionUser } from "@/lib/session";
 import type { Deal, Stage } from "@/lib/types";
 import PipelineBoard from "./PipelineBoard";
 
 export default async function PipelinePage() {
   const supabase = await createClient();
-  const user = await getSessionUser();
 
   const [{ data: stages }, { data: deals }] = await Promise.all([
     supabase.from("stages").select("*").order("sort"),
@@ -34,7 +32,6 @@ export default async function PipelinePage() {
         stages={(stages ?? []) as Stage[]}
         deals={(deals ?? []) as Deal[]}
         owners={owners as [string, string][]}
-        canEdit={user?.role !== "rep" || true}
       />
       <div className="legend">
         <span>

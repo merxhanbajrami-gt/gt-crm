@@ -104,8 +104,8 @@ export default async function ScorecardPage() {
 
       <div className="charts">
         <div className="chartcard">
-          <h3>Open cards by stage</h3>
-          <div className="chsub">Deal and lead cards, count</div>
+          <h3>Cards by stage</h3>
+          <div className="chsub">All deals across the pipeline, count</div>
           <div style={{ marginTop: 14 }}>
             {stages.map((r) => (
               <Bar
