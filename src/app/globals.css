@@ -3,3 +3,23 @@
 
 /* GT / OS design system — ported verbatim from the original prototype. */
 @import "../styles/_gtos.css";
+
+/* Inline-editable field inside the deal drawer */
+.dedit {
+  width: 100%;
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: #fff;
+}
+.dedit:focus {
+  outline: 2px solid var(--gt-blue-soft);
+  outline-offset: 1px;
+}
+.dedit:disabled {
+  opacity: 0.6;
+}

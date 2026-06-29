@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { fmtAge, gbp } from "@/lib/format";
+import { fmtAge } from "@/lib/format";
 import { TOUCH_KINDS, touchStatus } from "@/lib/cadence";
 import type { ActionItem, Deal, Stage } from "@/lib/types";
 
@@ -49,6 +49,17 @@ export default function DealDrawer({
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [valueInput, setValueInput] = useState(String(deal.value || ""));
+  const [verticalInput, setVerticalInput] = useState(deal.vertical ?? "");
+
+  function commitValue() {
+    const n = Math.max(0, Math.round(Number(valueInput) || 0));
+    if (n !== d.value) patchDeal({ value: n });
+  }
+  function commitVertical() {
+    const v = verticalInput.trim();
+    if (v !== (d.vertical ?? "")) patchDeal({ vertical: v || null });
+  }
 
   const loadActions = useCallback(async () => {
     const { data } = await supabase
@@ -203,6 +214,17 @@ export default function DealDrawer({
             </p>
           )}
 
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <button
+              className={`sm-pill ${d.hot ? "active" : ""}`}
+              style={{ ["--smc" as string]: "var(--amber)" }}
+              disabled={busy}
+              onClick={() => patchDeal({ hot: !d.hot })}
+            >
+              {d.hot ? "🔥 Hot" : "Mark hot"}
+            </button>
+          </div>
+
           {/* move stage */}
           <div className="dsection">Move stage</div>
           <div className="stagemove">
@@ -222,8 +244,18 @@ export default function DealDrawer({
           {/* details */}
           <div className="dgrid">
             <div className="dfield">
-              <div className="fl">Value</div>
-              <div className="fv">{d.value > 0 ? gbp(d.value) : "n/a"}</div>
+              <div className="fl">Value (£k)</div>
+              <input
+                className="dedit"
+                type="number"
+                min={0}
+                value={valueInput}
+                disabled={busy}
+                onChange={(e) => setValueInput(e.target.value)}
+                onBlur={commitValue}
+                onKeyDown={(e) => e.key === "Enter" && commitValue()}
+                placeholder="0"
+              />
             </div>
             <div className="dfield">
               <div className="fl">Owner</div>
@@ -243,9 +275,16 @@ export default function DealDrawer({
             </div>
             <div className="dfield">
               <div className="fl">Vertical</div>
-              <div className="fv" style={{ fontSize: 12 }}>
-                {d.vertical || "Unassigned"}
-              </div>
+              <input
+                className="dedit"
+                type="text"
+                value={verticalInput}
+                disabled={busy}
+                onChange={(e) => setVerticalInput(e.target.value)}
+                onBlur={commitVertical}
+                onKeyDown={(e) => e.key === "Enter" && commitVertical()}
+                placeholder="Unassigned"
+              />
             </div>
             <div className="dfield">
               <div className="fl">Email</div>
