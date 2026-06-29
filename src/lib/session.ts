@@ -30,14 +30,22 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const role = decodeRole(sessionData.session?.access_token);
+  const [{ data: sessionData }, { data: profile }, { data: roleRow }] =
+    await Promise.all([
+      supabase.auth.getSession(),
+      supabase
+        .from("profiles")
+        .select("full_name, rep_code")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+    ]);
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, rep_code")
-    .eq("id", user.id)
-    .maybeSingle();
+  // The user_roles table is the source of truth (matches RLS). Fall back to the
+  // JWT claim, then 'rep'.
+  const role: AppRole =
+    (roleRow?.role as AppRole) ??
+    decodeRole(sessionData.session?.access_token);
 
   const fullName =
     profile?.full_name ||

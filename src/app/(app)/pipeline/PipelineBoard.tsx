@@ -5,21 +5,26 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ageClass, fmtAge, gbp } from "@/lib/format";
 import type { Deal, Stage } from "@/lib/types";
+import DealDrawer, { type CurrentUser } from "./DealDrawer";
 
 export default function PipelineBoard({
   stages,
   deals: initialDeals,
   owners,
+  currentUser,
 }: {
   stages: Stage[];
   deals: Deal[];
   owners: [string, string][];
+  currentUser: CurrentUser;
 }) {
   const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState("all");
   const [dragId, setDragId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedDeal = deals.find((d) => d.id === selectedId) ?? null;
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(
@@ -150,6 +155,8 @@ export default function PipelineBoard({
                       draggable
                       onDragStart={() => setDragId(d.id)}
                       onDragEnd={() => setDragId(null)}
+                      onClick={() => setSelectedId(d.id)}
+                      style={{ cursor: "pointer" }}
                     >
                       <div className="kco">
                         {d.hot && (
@@ -192,6 +199,22 @@ export default function PipelineBoard({
           );
         })}
       </div>
+
+      {selectedDeal && (
+        <DealDrawer
+          key={selectedDeal.id}
+          deal={selectedDeal}
+          stages={stages}
+          owners={owners}
+          currentUser={currentUser}
+          onClose={() => setSelectedId(null)}
+          onChanged={(updated) =>
+            setDeals((ds) =>
+              ds.map((x) => (x.id === updated.id ? updated : x)),
+            )
+          }
+        />
+      )}
     </>
   );
 }
