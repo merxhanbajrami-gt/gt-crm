@@ -33,7 +33,20 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
+
+  // If an auth code/token lands on the wrong path (e.g. Supabase fell back to the
+  // Site URL root or /login), forward it to the callback so sign-in completes
+  // instead of being silently dropped.
+  if (
+    pathname !== "/auth/callback" &&
+    (searchParams.has("code") || searchParams.has("token_hash"))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   const isPublic =
     pathname.startsWith("/login") || pathname.startsWith("/auth");
 
