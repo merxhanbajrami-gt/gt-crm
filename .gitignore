@@ -49,3 +49,9 @@ hubspot-crm-exports-*.csv
 hubspot-crm-exports-*.zip
 all-contacts.csv
 /supabase/seed/hubspot-import.sql
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
