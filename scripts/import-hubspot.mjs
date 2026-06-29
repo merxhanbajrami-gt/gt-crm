@@ -53,7 +53,6 @@ const sq = (v) =>
   v === null || v === undefined || v === ""
     ? "null"
     : `'${String(v).replace(/'/g, "''")}'`;
-const bool = (v) => (v ? "true" : "false");
 
 // HubSpot deal stage (with emoji) -> app stage id
 const STAGE_MAP = {
