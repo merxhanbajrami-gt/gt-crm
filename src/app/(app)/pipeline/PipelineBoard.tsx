@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ageClass, fmtAge, gbp } from "@/lib/format";
 import type { Deal, Stage } from "@/lib/types";
 import DealDrawer, { type CurrentUser } from "./DealDrawer";
+import AddDealForm from "./AddDealForm";
 
 export default function PipelineBoard({
   stages,
@@ -24,6 +25,7 @@ export default function PipelineBoard({
   const [owner, setOwner] = useState("all");
   const [dragId, setDragId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const selectedDeal = deals.find((d) => d.id === selectedId) ?? null;
 
   const q = search.trim().toLowerCase();
@@ -87,6 +89,9 @@ export default function PipelineBoard({
           flexWrap: "wrap",
         }}
       >
+        <button className="addbtn" onClick={() => setAdding(true)}>
+          + Add deal
+        </button>
         <select
           className="ownerfilter"
           value={owner}
@@ -199,6 +204,20 @@ export default function PipelineBoard({
           );
         })}
       </div>
+
+      {adding && (
+        <AddDealForm
+          stages={stages}
+          owners={owners}
+          currentUser={currentUser}
+          onClose={() => setAdding(false)}
+          onCreated={(d) => {
+            setDeals((ds) => [d, ...ds]);
+            setAdding(false);
+            setSelectedId(d.id);
+          }}
+        />
+      )}
 
       {selectedDeal && (
         <DealDrawer
