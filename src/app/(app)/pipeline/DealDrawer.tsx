@@ -3,18 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fmtAge, gbp } from "@/lib/format";
+import { TOUCH_KINDS, touchStatus } from "@/lib/cadence";
 import type { ActionItem, Deal, Stage } from "@/lib/types";
 
-// target touch cadence per stage, in days
-const CADENCE: Record<string, number> = {
-  connection: 14,
-  pursue: 7,
-  attack: 5,
-  close: 3,
-  won: 30,
-  lost: 0,
-};
-const TOUCH_KINDS = ["touch", "call", "email", "meeting"];
 const DAY = 86400000;
 
 export interface CurrentUser {
@@ -149,15 +140,15 @@ export default function DealDrawer({
     loadActions();
   }
 
-  // ---- cadence ----
+  // ---- cadence (shared logic with My Week) ----
   const touches = actions.filter((a) => TOUCH_KINDS.includes(a.kind));
-  const lastTouch = touches[0] ? new Date(touches[0].created_at) : null;
-  const cadence = CADENCE[d.stage] ?? 7;
-  const nextTouch = lastTouch
-    ? new Date(lastTouch.getTime() + cadence * DAY)
-    : new Date();
+  const { cadence, lastTouch, nextTouch, daysOverdue } = touchStatus(
+    d.stage,
+    touches[0]?.created_at ?? null,
+    d.days_in_stage,
+  );
   const today = new Date();
-  const overdue = nextTouch.getTime() < today.getTime();
+  const overdue = daysOverdue > 0;
   const liveStage = d.stage !== "won" && d.stage !== "lost";
   const sIdx = stages.findIndex((x) => x.id === d.stage);
   const s = stages.find((x) => x.id === d.stage);

@@ -1,24 +1,58 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
-import { fmtAge, gbp } from "@/lib/format";
+import { TOUCH_KINDS, touchStatus } from "@/lib/cadence";
 import type { Deal } from "@/lib/types";
+import WeekList, { type WeekRow } from "./WeekList";
 
 export default async function MyWeekPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
 
-  // Deals going quiet are this week's work. RLS scopes reps to their own book;
-  // managers see the whole team.
-  const { data } = await supabase
-    .from("deals")
-    .select("*")
-    .not("stage", "in", "(won,lost)")
-    .order("days_in_stage", { ascending: false })
-    .limit(400);
+  // open deals (RLS scopes reps to their own book, managers see all) + every
+  // logged touch, so we can work out what's actually due for a touch this week.
+  const [{ data: dealData }, { data: touchData }] = await Promise.all([
+    supabase
+      .from("deals")
+      .select("*")
+      .not("stage", "in", "(won,lost)")
+      .limit(1000),
+    supabase
+      .from("actions")
+      .select("deal_id, created_at")
+      .in("kind", TOUCH_KINDS),
+  ]);
 
-  const deals = (data ?? []) as Deal[];
-  const quiet = deals.filter((d) => d.days_in_stage >= 30);
+  const deals = (dealData ?? []) as Deal[];
+
+  // latest touch per deal
+  const lastTouch = new Map<string, string>();
+  for (const t of touchData ?? []) {
+    const prev = lastTouch.get(t.deal_id as string);
+    if (!prev || (t.created_at as string) > prev) {
+      lastTouch.set(t.deal_id as string, t.created_at as string);
+    }
+  }
+
+  const rows: WeekRow[] = deals
+    .map((d) => {
+      const st = touchStatus(d.stage, lastTouch.get(d.id) ?? null, d.days_in_stage);
+      return { d, daysOverdue: st.daysOverdue };
+    })
+    // due within the next 7 days or already overdue
+    .filter((x) => x.daysOverdue >= -7)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+    .map(({ d, daysOverdue }) => ({
+      id: d.id,
+      company: d.company,
+      dealname: d.dealname,
+      vertical: d.vertical,
+      value: d.value,
+      owner_code: d.owner_code,
+      hot: d.hot,
+      daysOverdue,
+    }));
+
+  const overdueCount = rows.filter((r) => r.daysOverdue > 0).length;
   const first = user?.fullName.split(" ")[0] ?? "there";
   const isManager = user?.role !== "rep";
 
@@ -36,73 +70,24 @@ export default async function MyWeekPage() {
           Good morning, <em>{first}</em>.
         </div>
         <p className="brief-line">
-          {quiet.length > 0 ? (
+          {rows.length > 0 ? (
             <>
-              {quiet.length} {isManager ? "deals across the team" : "of your deals"}{" "}
-              have gone quiet for 30+ days. Clear the list so nothing slips.
+              {rows.length} {isManager ? "deals" : "of your deals"} need a touch
+              this week
+              {overdueCount > 0 ? ` — ${overdueCount} already overdue` : ""}.
+              Log a touch to clear each one.
             </>
           ) : (
-            <>Nothing is overdue for a touch. Your book is on the clock.</>
+            <>Nothing is due for a touch this week. Your book is on the clock.</>
           )}
         </p>
       </div>
 
-      <div className="panel">
-        <div className="panel-head">
-          <h2>{isManager ? "Team watchlist" : "Your actions this week"}</h2>
-          <span className="count">{quiet.length}</span>
-        </div>
-
-        {quiet.length === 0 ? (
-          <div className="dayclear" style={{ display: "block" }}>
-            <div className="ring">✓</div>
-            <div className="big">Week clear.</div>
-            <div className="sub">
-              Every open lead got its touch. Nothing is slipping.
-            </div>
-          </div>
-        ) : (
-          <div>
-            {quiet.slice(0, 40).map((d) => {
-              const sev = d.days_in_stage >= 90 ? "stuck" : "warn";
-              return (
-                <div className="action-row" key={d.id}>
-                  <span
-                    className="owner-dot"
-                    style={{ width: 30, height: 30 }}
-                  >
-                    {d.owner_code}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700 }}>
-                      {d.company}
-                      {d.hot && (
-                        <span
-                          className="actiondot"
-                          style={{ background: "var(--amber)", marginLeft: 8 }}
-                          title="Hot"
-                        />
-                      )}
-                    </div>
-                    <div className="statsub">
-                      {d.dealname || d.vertical || "—"}
-                      {d.value > 0 ? ` · ${gbp(d.value)}` : ""}
-                    </div>
-                  </div>
-                  <span className={`kage ${sev}`}>
-                    {fmtAge(d.days_in_stage)} quiet
-                  </span>
-                </div>
-              );
-            })}
-            <div style={{ marginTop: 14 }}>
-              <Link href="/pipeline" className="addbtn">
-                Open the pipeline →
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+      <WeekList
+        title={isManager ? "Team — due for a touch" : "Your touches this week"}
+        rows={rows}
+        currentUser={{ id: user!.id, repCode: user!.repCode }}
+      />
     </section>
   );
 }
