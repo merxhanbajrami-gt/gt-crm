@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
 import { TOUCH_KINDS, touchStatus } from "@/lib/cadence";
-import type { Deal } from "@/lib/types";
+import type { Deal, Stage } from "@/lib/types";
 import WeekList, { type WeekRow } from "./WeekList";
+import AddDealButton from "./AddDealButton";
 
 export default async function MyWeekPage() {
   const supabase = await createClient();
@@ -10,19 +11,33 @@ export default async function MyWeekPage() {
 
   // open deals (RLS scopes reps to their own book, managers see all) + every
   // logged touch, so we can work out what's actually due for a touch this week.
-  const [{ data: dealData }, { data: touchData }] = await Promise.all([
-    supabase
-      .from("deals")
-      .select("*")
-      .not("stage", "in", "(won,lost)")
-      .limit(1000),
-    supabase
-      .from("actions")
-      .select("deal_id, created_at")
-      .in("kind", TOUCH_KINDS),
-  ]);
+  const [{ data: dealData }, { data: touchData }, { data: stageData }, { data: ownerData }] =
+    await Promise.all([
+      supabase
+        .from("deals")
+        .select("*")
+        .not("stage", "in", "(won,lost)")
+        .limit(1000),
+      supabase
+        .from("actions")
+        .select("deal_id, created_at")
+        .in("kind", TOUCH_KINDS),
+      supabase.from("stages").select("*").order("sort"),
+      supabase.from("deals").select("owner_code, owner_name").not("owner_code", "is", null),
+    ]);
 
   const deals = (dealData ?? []) as Deal[];
+
+  // stages + owner options for the Add deal form
+  const stages = (stageData ?? []) as Stage[];
+  const owners = Array.from(
+    new Map(
+      (ownerData ?? []).map((d) => [
+        d.owner_code as string,
+        (d.owner_name as string) || (d.owner_code as string),
+      ]),
+    ).entries(),
+  ).sort((a, b) => String(a[1]).localeCompare(String(b[1]))) as [string, string][];
 
   // latest touch per deal
   const lastTouch = new Map<string, string>();
@@ -81,6 +96,17 @@ export default async function MyWeekPage() {
             <>Nothing is due for a touch this week. Your book is on the clock.</>
           )}
         </p>
+        <div style={{ marginTop: 18 }}>
+          <AddDealButton
+            stages={stages}
+            owners={owners}
+            currentUser={{
+              id: user!.id,
+              fullName: user!.fullName,
+              repCode: user!.repCode,
+            }}
+          />
+        </div>
       </div>
 
       <WeekList
