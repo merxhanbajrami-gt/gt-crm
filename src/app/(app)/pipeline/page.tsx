@@ -12,10 +12,15 @@ export default async function PipelinePage() {
     supabase.from("deals").select("*").order("value", { ascending: false }),
   ]);
 
+  // The board is the working pipeline; lost deals live under the dedicated
+  // Lost tab, so keep that column off the board (6 columns wrap and break).
+  const boardStages = (stages ?? []).filter((s) => s.id !== "lost");
+  const boardDeals = (deals ?? []).filter((d) => d.stage !== "lost");
+
   // owner filter options (rep codes present in the visible book)
   const owners = Array.from(
     new Map(
-      (deals ?? [])
+      boardDeals
         .filter((d) => d.owner_code)
         .map((d) => [d.owner_code, d.owner_name || d.owner_code]),
     ).entries(),
@@ -26,13 +31,13 @@ export default async function PipelinePage() {
       <div className="eyebrow">Deal flow</div>
       <h1 className="view-title">Where every lead stands</h1>
       <p className="view-sub">
-        {(deals ?? []).length} live cards from the pipeline. Each column is a
+        {boardDeals.length} live cards from the pipeline. Each column is a
         job, not a label. Drag a card to restage it. Amber dot means the deal is
         flagged hot. Columns scroll.
       </p>
       <PipelineBoard
-        stages={(stages ?? []) as Stage[]}
-        deals={(deals ?? []) as Deal[]}
+        stages={boardStages as Stage[]}
+        deals={boardDeals as Deal[]}
         owners={owners as [string, string][]}
         currentUser={{
           id: user!.id,

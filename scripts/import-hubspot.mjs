@@ -105,7 +105,9 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 // Amount is a real figure only when > 1 (export is full of 1.0 placeholders).
-const dealValue = (amount) => (num(amount) > 1 ? num(amount) : 0);
+// The app stores value in THOUSANDS (£k, see src/lib/format.ts), but HubSpot
+// Amount is in actual £ — so scale down by 1000 and round.
+const dealValue = (amount) => (num(amount) > 1 ? Math.round(num(amount) / 1000) : 0);
 
 // ---------- build SQL ----------
 const deals = parseCsv(readFileSync(dealsPath, "utf8"));
