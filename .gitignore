@@ -43,3 +43,9 @@ next-env.d.ts
 .playwright-mcp/
 login.png
 snap.md
+
+# raw CRM exports + generated import SQL — contain real PII, never commit
+hubspot-crm-exports-*.csv
+hubspot-crm-exports-*.zip
+all-contacts.csv
+/supabase/seed/hubspot-import.sql
