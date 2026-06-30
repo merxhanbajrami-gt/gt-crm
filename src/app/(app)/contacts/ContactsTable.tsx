@@ -51,7 +51,8 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
     }
   }
 
-  const arrow = (k: SortKey) => (sortKey === k ? (asc ? " ▲" : " ▼") : "");
+  const arrow = (k: SortKey) =>
+    sortKey === k ? <span className="arrow">{asc ? "▲" : "▼"}</span> : null;
 
   return (
     <>

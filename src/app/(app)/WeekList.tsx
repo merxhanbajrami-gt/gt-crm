@@ -93,8 +93,9 @@ export default function WeekList({
               </div>
             </div>
             <span
-              className={`kage ${overdue ? "stuck" : "warn"}`}
-              style={{ marginRight: 12 }}
+              className={`a-due ${
+                overdue ? "over" : r.daysOverdue === 0 ? "due" : "ok"
+              }`}
             >
               {label}
             </span>

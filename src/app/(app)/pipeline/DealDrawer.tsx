@@ -347,7 +347,7 @@ export default function DealDrawer({
                     </div>
                   </div>
                 </div>
-                <span className={`cad-status ${overdue ? "over" : ""}`}>
+                <span className={`cad-status ${overdue ? "overdue" : "ontrack"}`}>
                   {overdue ? "Overdue for a touch" : "On track"}
                 </span>
                 <div className="cad-actions">
