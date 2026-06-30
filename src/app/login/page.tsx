@@ -90,7 +90,7 @@ function LoginInner() {
             </>
           )}
           <p className="lf-note">
-            Internal only · restricted to gt-hq.com accounts
+            Internal only · restricted to GT-HQ accounts
           </p>
         </div>
       </div>
