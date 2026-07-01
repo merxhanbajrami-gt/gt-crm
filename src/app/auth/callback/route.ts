@@ -28,7 +28,9 @@ export async function GET(request: Request) {
 
   if (code) {
     const { error: e } = await supabase.auth.exchangeCodeForSession(code);
-    return e ? fail(e.message) : NextResponse.redirect(new URL(next, origin));
+    return e
+      ? fail(e.code ?? e.message)
+      : NextResponse.redirect(new URL(next, origin));
   }
 
   if (tokenHash && type) {
@@ -36,7 +38,9 @@ export async function GET(request: Request) {
       type,
       token_hash: tokenHash,
     });
-    return e ? fail(e.message) : NextResponse.redirect(new URL(next, origin));
+    return e
+      ? fail(e.code ?? e.message)
+      : NextResponse.redirect(new URL(next, origin));
   }
 
   return fail("missing_auth_params");
