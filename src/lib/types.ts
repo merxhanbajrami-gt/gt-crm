@@ -69,6 +69,22 @@ export interface ActionItem {
   created_at: string;
 }
 
+export type IdeaPriority = "high" | "medium" | "low";
+
+export interface Idea {
+  id: string;
+  title: string;
+  detail: string | null;
+  priority: IdeaPriority;
+  sort: number;
+  suggested_by: string | null;
+  author_id: string | null;
+  author_name: string | null;
+  status: "active" | "trashed";
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;

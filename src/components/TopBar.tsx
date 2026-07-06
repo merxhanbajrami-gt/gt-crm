@@ -10,6 +10,7 @@ const TABS = [
   { href: "/lost", label: "Lost" },
   { href: "/contacts", label: "Contacts" },
   { href: "/scorecard", label: "Scorecard" },
+  { href: "/ideas", label: "Ideas" },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
