@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Idea, IdeaPriority } from "@/lib/types";
 
@@ -35,6 +35,7 @@ export default function IdeaBoard({
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
   const [suggestedBy, setSuggestedBy] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const active = ideas.filter((i) => i.status === "active");
   const trashed = ideas.filter((i) => i.status === "trashed");
@@ -51,7 +52,11 @@ export default function IdeaBoard({
   async function addIdea(e: React.FormEvent) {
     e.preventDefault();
     const t = title.trim();
-    if (!t) return;
+    if (!t) {
+      // clicked with no idea typed — guide them to the field rather than no-op
+      titleRef.current?.focus();
+      return;
+    }
     setBusy(true);
     // new ideas land at the top of Medium (lowest sort wins the ascending order)
     const minSort = Math.min(0, ...active.map((i) => i.sort));
@@ -117,6 +122,7 @@ export default function IdeaBoard({
         style={{ padding: 16, marginBottom: 16, display: "grid", gap: 10 }}
       >
         <input
+          ref={titleRef}
           className="dedit"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -135,7 +141,7 @@ export default function IdeaBoard({
             onChange={(e) => setSuggestedBy(e.target.value)}
             placeholder="Suggested by (optional)"
           />
-          <button className="addbtn" type="submit" disabled={busy || !title.trim()}>
+          <button className="addbtn" type="submit" disabled={busy}>
             {busy ? "Adding…" : "+ Add idea"}
           </button>
         </div>

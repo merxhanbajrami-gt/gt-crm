@@ -204,8 +204,9 @@ td a:hover{text-decoration:underline;}
 .signout:hover{color:var(--text);border-color:var(--text-faint);}
 
 /* ---------- Add deal ---------- */
-.addbtn{background:var(--gt-blue);border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:700;padding:9px 16px;}
+.addbtn{background:var(--gt-blue);border:none;border-radius:6px;color:#fff;font-size:13px;font-weight:700;padding:9px 16px;cursor:pointer;}
 .addbtn:hover{background:var(--gt-blue-soft);}
+.addbtn:disabled{opacity:.55;cursor:not-allowed;}
 .ctx-del{background:none;border:none;color:var(--text-faint);font-family:inherit;font-size:9px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:0;}
 .ctx-del:hover{color:var(--red);}
 .ctx-add{width:100%;background:#fff;border:1px solid var(--border-mid);border-radius:6px;color:var(--text);padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;min-height:62px;margin-top:8px;}
