@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import type { Contact } from "@/lib/types";
+
+export const CONTACTS_PAGE = 200;
 
 type SortKey = "name" | "dealname" | "stage" | "owner_code";
 type Filter = "all" | "active" | "won" | "lost";
@@ -13,35 +16,61 @@ const FILTERS: { f: Filter; label: string }[] = [
   { f: "lost", label: "Lost" },
 ];
 
-export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
+const ACTIVE_STAGES = ["connection", "pursue", "attack", "close"];
+const SEARCH_COLS = ["name", "dealname", "title", "email", "owner_code"];
+
+export default function ContactsTable({
+  initialContacts,
+  total,
+}: {
+  initialContacts: Contact[];
+  total: number;
+}) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [asc, setAsc] = useState(true);
 
-  const rows = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    let out = contacts.filter((c) => {
-      if (filter === "won" && c.stage !== "won") return false;
-      if (filter === "lost" && c.stage !== "lost") return false;
-      if (
-        filter === "active" &&
-        !["connection", "pursue", "attack", "close"].includes(c.stage ?? "")
-      )
-        return false;
-      if (!term) return true;
-      return [c.name, c.dealname, c.title, c.email, c.owner_code]
-        .join(" ")
-        .toLowerCase()
-        .includes(term);
-    });
-    out = [...out].sort((a, b) => {
-      const av = String(a[sortKey] ?? "").toLowerCase();
-      const bv = String(b[sortKey] ?? "").toLowerCase();
-      return asc ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
-    return out;
-  }, [contacts, q, filter, sortKey, asc]);
+  const [rows, setRows] = useState<Contact[]>(initialContacts);
+  const [matches, setMatches] = useState(total);
+  const [loading, setLoading] = useState(false);
+  const didMount = useRef(false);
+
+  // Query the whole table server-side whenever the search/filter/sort changes.
+  // Debounced so typing doesn't fire a request per keystroke.
+  useEffect(() => {
+    // skip the first run — the server already gave us page 1 + the total
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    const handle = setTimeout(async () => {
+      setLoading(true);
+      const supabase = createClient();
+      let query = supabase
+        .from("contacts")
+        .select("*", { count: "exact" })
+        .order(sortKey, { ascending: asc })
+        .limit(CONTACTS_PAGE);
+
+      if (filter === "won") query = query.eq("stage", "won");
+      else if (filter === "lost") query = query.eq("stage", "lost");
+      else if (filter === "active") query = query.in("stage", ACTIVE_STAGES);
+
+      const term = q.trim().replace(/[,()]/g, " ").trim();
+      if (term) {
+        query = query.or(
+          SEARCH_COLS.map((c) => `${c}.ilike.%${term}%`).join(","),
+        );
+      }
+
+      const { data, count } = await query;
+      setRows((data ?? []) as Contact[]);
+      setMatches(count ?? 0);
+      setLoading(false);
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [q, filter, sortKey, asc]);
 
   function sortBy(k: SortKey) {
     if (k === sortKey) setAsc((v) => !v);
@@ -90,7 +119,7 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 500).map((c) => (
+            {rows.map((c) => (
               <tr key={c.id}>
                 <td>
                   {c.name}
@@ -109,12 +138,13 @@ export default function ContactsTable({ contacts }: { contacts: Contact[] }) {
             ))}
           </tbody>
         </table>
-        {rows.length > 500 && (
-          <p className="lf-note" style={{ padding: "10px 4px" }}>
-            Showing first 500 of {rows.length.toLocaleString()} matches — refine
-            your search.
-          </p>
-        )}
+        <p className="lf-note" style={{ padding: "10px 4px" }}>
+          {loading
+            ? "Searching…"
+            : matches > rows.length
+              ? `Showing first ${rows.length.toLocaleString()} of ${matches.toLocaleString()} matches — refine your search.`
+              : `${matches.toLocaleString()} ${matches === 1 ? "match" : "matches"}.`}
+        </p>
       </div>
     </>
   );

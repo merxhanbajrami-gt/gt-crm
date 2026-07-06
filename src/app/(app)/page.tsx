@@ -1,34 +1,49 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
-import { TOUCH_KINDS, touchStatus } from "@/lib/cadence";
-import type { Deal, Stage } from "@/lib/types";
-import WeekList, { type WeekRow } from "./WeekList";
+import { TASK_KIND } from "@/lib/cadence";
+import type { Stage } from "@/lib/types";
+import WeekList, { type TaskRow } from "./WeekList";
 import AddDealButton from "./AddDealButton";
+
+// A task joined to its deal, as returned by the embedded select below.
+interface TaskQueryRow {
+  id: string;
+  note: string | null;
+  due_date: string | null;
+  owner_code: string | null;
+  deal: {
+    id: string;
+    company: string | null;
+    dealname: string | null;
+    value: number;
+    hot: boolean;
+  } | null;
+}
 
 export default async function MyWeekPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
 
-  // open deals (RLS scopes reps to their own book, managers see all) + every
-  // logged touch, so we can work out what's actually due for a touch this week.
-  const [{ data: dealData }, { data: touchData }, { data: stageData }, { data: ownerData }] =
+  // Open tasks assigned to the current user (RLS scopes reps to their own,
+  // managers see the whole team). Each task carries its deal for context.
+  const [{ data: taskData }, { data: stageData }, { data: ownerData }] =
     await Promise.all([
       supabase
-        .from("deals")
-        .select("*")
-        .not("stage", "in", "(won,lost)")
-        .limit(1000),
-      supabase
         .from("actions")
-        .select("deal_id, created_at")
-        .in("kind", TOUCH_KINDS),
+        .select(
+          "id, note, due_date, owner_code, deal:deals(id, company, dealname, value, hot)",
+        )
+        .eq("kind", TASK_KIND)
+        .eq("done", false)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(1000),
       supabase.from("stages").select("*").order("sort"),
-      supabase.from("deals").select("owner_code, owner_name").not("owner_code", "is", null),
+      supabase
+        .from("deals")
+        .select("owner_code, owner_name")
+        .not("owner_code", "is", null),
     ]);
 
-  const deals = (dealData ?? []) as Deal[];
-
-  // stages + owner options for the Add deal form
   const stages = (stageData ?? []) as Stage[];
   const owners = Array.from(
     new Map(
@@ -39,35 +54,24 @@ export default async function MyWeekPage() {
     ).entries(),
   ).sort((a, b) => String(a[1]).localeCompare(String(b[1]))) as [string, string][];
 
-  // latest touch per deal
-  const lastTouch = new Map<string, string>();
-  for (const t of touchData ?? []) {
-    const prev = lastTouch.get(t.deal_id as string);
-    if (!prev || (t.created_at as string) > prev) {
-      lastTouch.set(t.deal_id as string, t.created_at as string);
-    }
-  }
+  const rows: TaskRow[] = ((taskData ?? []) as unknown as TaskQueryRow[]).map(
+    (t) => ({
+      id: t.id,
+      objective: t.note ?? "",
+      due_date: t.due_date,
+      owner_code: t.owner_code,
+      dealId: t.deal?.id ?? null,
+      company: t.deal?.company ?? null,
+      dealname: t.deal?.dealname ?? null,
+      value: t.deal?.value ?? 0,
+      hot: t.deal?.hot ?? false,
+    }),
+  );
 
-  const rows: WeekRow[] = deals
-    .map((d) => {
-      const st = touchStatus(d.stage, lastTouch.get(d.id) ?? null, d.days_in_stage);
-      return { d, daysOverdue: st.daysOverdue };
-    })
-    // due within the next 7 days or already overdue
-    .filter((x) => x.daysOverdue >= -7)
-    .sort((a, b) => b.daysOverdue - a.daysOverdue)
-    .map(({ d, daysOverdue }) => ({
-      id: d.id,
-      company: d.company,
-      dealname: d.dealname,
-      vertical: d.vertical,
-      value: d.value,
-      owner_code: d.owner_code,
-      hot: d.hot,
-      daysOverdue,
-    }));
-
-  const overdueCount = rows.filter((r) => r.daysOverdue > 0).length;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const overdueCount = rows.filter(
+    (r) => r.due_date != null && r.due_date < todayStr,
+  ).length;
   const first = user?.fullName.split(" ")[0] ?? "there";
   const isManager = user?.role !== "rep";
 
@@ -87,13 +91,13 @@ export default async function MyWeekPage() {
         <p className="brief-line">
           {rows.length > 0 ? (
             <>
-              {rows.length} {isManager ? "deals" : "of your deals"} need a touch
-              this week
-              {overdueCount > 0 ? ` — ${overdueCount} already overdue` : ""}.
-              Log a touch to clear each one.
+              {rows.length} open {isManager ? "team " : ""}
+              {rows.length === 1 ? "task" : "tasks"}
+              {overdueCount > 0 ? ` — ${overdueCount} overdue` : ""}. Tick each
+              one off as you go.
             </>
           ) : (
-            <>Nothing is due for a touch this week. Your book is on the clock.</>
+            <>No open tasks. Add tasks from any deal to plan your week.</>
           )}
         </p>
         <div style={{ marginTop: 18 }}>
@@ -109,11 +113,7 @@ export default async function MyWeekPage() {
         </div>
       </div>
 
-      <WeekList
-        title={isManager ? "Team — due for a touch" : "Your touches this week"}
-        rows={rows}
-        currentUser={{ id: user!.id, repCode: user!.repCode }}
-      />
+      <WeekList title={isManager ? "Team tasks" : "Your tasks"} rows={rows} />
     </section>
   );
 }

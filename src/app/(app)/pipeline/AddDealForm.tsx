@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { LEAD_SOURCES } from "@/lib/sources";
 import type { Deal, Stage } from "@/lib/types";
 import type { CurrentUser } from "./DealDrawer";
 
@@ -25,6 +26,7 @@ export default function AddDealForm({
   const [stage, setStage] = useState("connection");
   const [value, setValue] = useState("");
   const [vertical, setVertical] = useState("");
+  const [source, setSource] = useState("");
   const [ownerCode, setOwnerCode] = useState(currentUser.repCode ?? "");
   const [hot, setHot] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,6 +57,7 @@ export default function AddDealForm({
         stage,
         value: Math.max(0, Math.round(Number(value) || 0)),
         vertical: vertical.trim() || null,
+        source: source || null,
         owner_code: ownerCode || null,
         owner_name: ownerName,
         owner_id: ownerCode === currentUser.repCode ? currentUser.id : null,
@@ -185,6 +188,23 @@ export default function AddDealForm({
                 onChange={(e) => setVertical(e.target.value)}
               />
             </div>
+            <div>
+              <div style={label}>Lead source</div>
+              <select
+                className="dedit"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+              >
+                <option value="">Unknown</option>
+                {LEAD_SOURCES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Owner</div>
               <select

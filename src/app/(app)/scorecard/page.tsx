@@ -11,6 +11,10 @@ interface VerticalRow {
   vertical: string;
   count: number;
 }
+interface SourceRow {
+  source: string;
+  count: number;
+}
 
 function Bar({
   label,
@@ -62,18 +66,21 @@ function Bar({
 
 export default async function ScorecardPage() {
   const supabase = await createClient();
-  const [{ data: summary }, { data: byStage }, { data: byVertical }] =
+  const [{ data: summary }, { data: byStage }, { data: byVertical }, { data: bySource }] =
     await Promise.all([
       supabase.rpc("scorecard_summary"),
       supabase.from("v_pipeline_by_stage").select("*"),
       supabase.from("v_pipeline_by_vertical").select("*").limit(8),
+      supabase.from("v_deals_by_source").select("*").limit(8),
     ]);
 
   const s = (summary ?? {}) as Record<string, number>;
   const stages = (byStage ?? []) as StageRow[];
   const verticals = (byVertical ?? []) as VerticalRow[];
+  const sources = (bySource ?? []) as SourceRow[];
   const maxStage = Math.max(1, ...stages.map((r) => r.count));
   const maxVert = Math.max(1, ...verticals.map((r) => r.count));
+  const maxSource = Math.max(1, ...sources.map((r) => r.count));
 
   const bignums = [
     { k: "Contacts on record", v: s.total_contacts ?? 0, sub: "unique people in the book" },
@@ -130,6 +137,22 @@ export default async function ScorecardPage() {
                 value={r.count}
                 max={maxVert}
                 color="var(--gt-blue)"
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="chartcard">
+          <h3>Leads by source</h3>
+          <div className="chsub">Which channels bring the most deals</div>
+          <div style={{ marginTop: 14 }}>
+            {sources.map((r) => (
+              <Bar
+                key={r.source}
+                label={r.source}
+                value={r.count}
+                max={maxSource}
+                color="#7B7AE6"
               />
             ))}
           </div>

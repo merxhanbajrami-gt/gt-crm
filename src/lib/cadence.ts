@@ -11,6 +11,10 @@ export const STAGE_CADENCE: Record<string, number> = {
 
 export const TOUCH_KINDS = ["touch", "call", "email", "meeting"];
 
+// A task (kind='task') is an assigned to-do with an objective, due date and
+// assignee — distinct from a logged touch/note. Powers My Week.
+export const TASK_KIND = "task";
+
 const DAY = 86400000;
 
 export interface TouchStatus {

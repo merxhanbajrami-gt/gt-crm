@@ -13,18 +13,20 @@ export default function PipelineBoard({
   deals: initialDeals,
   owners,
   currentUser,
+  initialDealId = null,
 }: {
   stages: Stage[];
   deals: Deal[];
   owners: [string, string][];
   currentUser: CurrentUser;
+  initialDealId?: string | null;
 }) {
   const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState("all");
   const [dragId, setDragId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialDealId);
   const [adding, setAdding] = useState(false);
   const selectedDeal = deals.find((d) => d.id === selectedId) ?? null;
 

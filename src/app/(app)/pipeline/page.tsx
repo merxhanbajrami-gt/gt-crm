@@ -3,7 +3,12 @@ import { getSessionUser } from "@/lib/session";
 import type { Deal, Stage } from "@/lib/types";
 import PipelineBoard from "./PipelineBoard";
 
-export default async function PipelinePage() {
+export default async function PipelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deal?: string }>;
+}) {
+  const { deal: initialDealId } = await searchParams;
   const supabase = await createClient();
   const user = await getSessionUser();
 
@@ -39,6 +44,7 @@ export default async function PipelinePage() {
         stages={boardStages as Stage[]}
         deals={boardDeals as Deal[]}
         owners={owners as [string, string][]}
+        initialDealId={initialDealId ?? null}
         currentUser={{
           id: user!.id,
           fullName: user!.fullName,

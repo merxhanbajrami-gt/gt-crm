@@ -34,6 +34,8 @@ export interface Deal {
   owner_id: string | null;
   vertical: string | null;
   source: string | null;
+  first_touch_date: string | null;
+  close_date: string | null;
   hot: boolean;
   last_activity: string | null;
   n_contacts: number;
@@ -59,6 +61,7 @@ export interface ActionItem {
   deal_id: string | null;
   owner_id: string | null;
   owner_code: string | null;
+  created_by: string | null;
   kind: string;
   note: string | null;
   due_date: string | null;

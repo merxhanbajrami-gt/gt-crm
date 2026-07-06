@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fmtAge } from "@/lib/format";
-import { TOUCH_KINDS, touchStatus } from "@/lib/cadence";
+import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
+import { LEAD_SOURCES } from "@/lib/sources";
 import type { ActionItem, Deal, Stage } from "@/lib/types";
 
 const DAY = 86400000;
@@ -51,6 +52,15 @@ export default function DealDrawer({
   const [busy, setBusy] = useState(false);
   const [valueInput, setValueInput] = useState(String(deal.value || ""));
   const [verticalInput, setVerticalInput] = useState(deal.vertical ?? "");
+  // task composer
+  const [taskNote, setTaskNote] = useState("");
+  const [taskDue, setTaskDue] = useState("");
+  const [taskAssignee, setTaskAssignee] = useState(
+    deal.owner_code ?? currentUser.repCode ?? "",
+  );
+  // inline note editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
 
   function commitValue() {
     const n = Math.max(0, Math.round(Number(valueInput) || 0));
@@ -59,6 +69,13 @@ export default function DealDrawer({
   function commitVertical() {
     const v = verticalInput.trim();
     if (v !== (d.vertical ?? "")) patchDeal({ vertical: v || null });
+  }
+  function commitSource(v: string) {
+    if (v !== (d.source ?? "")) patchDeal({ source: v || null });
+  }
+  function commitDate(field: "first_touch_date" | "close_date", v: string) {
+    const next = v || null;
+    if (next !== (d[field] ?? null)) patchDeal({ [field]: next } as Partial<Deal>);
   }
 
   const loadActions = useCallback(async () => {
@@ -151,8 +168,62 @@ export default function DealDrawer({
     loadActions();
   }
 
+  // ---- tasks (kind='task') ----
+  async function addTask() {
+    const objective = taskNote.trim();
+    if (!objective) return;
+    setBusy(true);
+    // assign to self → also set owner_id so it surfaces via either RLS path;
+    // assigning to another rep relies on the owner_code policy.
+    const ownerId =
+      taskAssignee === currentUser.repCode ? currentUser.id : null;
+    const { error } = await supabase.from("actions").insert({
+      deal_id: d.id,
+      kind: TASK_KIND,
+      note: objective,
+      due_date: taskDue || null,
+      owner_code: taskAssignee || null,
+      owner_id: ownerId,
+      created_by: currentUser.id,
+      done: false,
+    });
+    setBusy(false);
+    if (error) {
+      alert("Could not add task: " + error.message);
+      return;
+    }
+    setTaskNote("");
+    setTaskDue("");
+    await loadActions();
+  }
+
+  // ---- inline note editing ----
+  async function saveNoteEdit(a: ActionItem) {
+    const text = editingText.trim();
+    setEditingId(null);
+    if (!text || text === (a.note ?? "")) return;
+    const { error } = await supabase
+      .from("actions")
+      .update({ note: text })
+      .eq("id", a.id);
+    if (error) {
+      alert("Could not save note: " + error.message);
+      return;
+    }
+    loadActions();
+  }
+
+  async function deleteAction(a: ActionItem) {
+    await supabase.from("actions").delete().eq("id", a.id);
+    loadActions();
+  }
+
+  // tasks live in their own section; the timeline shows touches + notes only
+  const tasks = actions.filter((a) => a.kind === TASK_KIND);
+  const timeline = actions.filter((a) => a.kind !== TASK_KIND);
+
   // ---- cadence (shared logic with My Week) ----
-  const touches = actions.filter((a) => TOUCH_KINDS.includes(a.kind));
+  const touches = timeline.filter((a) => TOUCH_KINDS.includes(a.kind));
   const { cadence, lastTouch, nextTouch, daysOverdue } = touchStatus(
     d.stage,
     touches[0]?.created_at ?? null,
@@ -316,6 +387,42 @@ export default function DealDrawer({
                 )}
               </div>
             </div>
+            <div className="dfield">
+              <div className="fl">Lead source</div>
+              <select
+                className="dedit"
+                value={d.source ?? ""}
+                disabled={busy}
+                onChange={(e) => commitSource(e.target.value)}
+              >
+                <option value="">Unknown</option>
+                {LEAD_SOURCES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="dfield">
+              <div className="fl">First touch</div>
+              <input
+                className="dedit"
+                type="date"
+                value={d.first_touch_date ?? ""}
+                disabled={busy}
+                onChange={(e) => commitDate("first_touch_date", e.target.value)}
+              />
+            </div>
+            <div className="dfield">
+              <div className="fl">Close date</div>
+              <input
+                className="dedit"
+                type="date"
+                value={d.close_date ?? ""}
+                disabled={busy}
+                onChange={(e) => commitDate("close_date", e.target.value)}
+              />
+            </div>
           </div>
 
           {/* cadence */}
@@ -390,6 +497,100 @@ export default function DealDrawer({
             </button>
           </div>
 
+          {/* tasks */}
+          <div className="dsection">Tasks</div>
+          <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+            <input
+              className="dedit"
+              value={taskNote}
+              onChange={(e) => setTaskNote(e.target.value)}
+              placeholder="Task objective — e.g. send the proposal, book the call…"
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input
+                className="dedit"
+                type="date"
+                value={taskDue}
+                onChange={(e) => setTaskDue(e.target.value)}
+                title="Due date"
+              />
+              <select
+                className="dedit"
+                value={taskAssignee}
+                onChange={(e) => setTaskAssignee(e.target.value)}
+                title="Assignee"
+              >
+                <option value="">Unassigned</option>
+                {owners.map(([c, n]) => (
+                  <option key={c} value={c}>
+                    {n} ({c})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              className="ctx-addbtn"
+              disabled={busy || !taskNote.trim()}
+              onClick={addTask}
+            >
+              Add task
+            </button>
+          </div>
+          <div className="timeline">
+            {tasks.length === 0 && (
+              <div className="cm" style={{ padding: "4px 0 8px" }}>
+                No tasks yet.
+              </div>
+            )}
+            {tasks.map((t) => {
+              const overdue =
+                !t.done &&
+                t.due_date != null &&
+                t.due_date < today.toISOString().slice(0, 10);
+              return (
+                <div key={t.id} className="tl-item">
+                  <button
+                    className="ctx-del"
+                    onClick={() => toggleDone(t)}
+                    title="Toggle done"
+                    style={{ minWidth: 0 }}
+                  >
+                    {t.done ? "☑" : "☐"}
+                  </button>
+                  <div className="tl-body">
+                    <div
+                      className="tt"
+                      style={{
+                        textDecoration: t.done ? "line-through" : "none",
+                        color: t.done ? "var(--text-faint)" : undefined,
+                      }}
+                    >
+                      {t.note}
+                    </div>
+                    <div className="tw">
+                      {t.due_date ? (
+                        <span style={{ color: overdue ? "var(--red, #DC2626)" : undefined }}>
+                          {overdue ? "Overdue · " : "Due "}
+                          {fmtDate(t.due_date)}
+                        </span>
+                      ) : (
+                        "No due date"
+                      )}
+                      {t.owner_code ? ` · ${t.owner_code}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    className="ctx-del"
+                    onClick={() => deleteAction(t)}
+                    title="Delete task"
+                  >
+                    delete
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
           {/* activity / notes */}
           <div className="dsection">Notes &amp; activity</div>
           <textarea
@@ -410,36 +611,78 @@ export default function DealDrawer({
           </button>
 
           <div className="timeline" style={{ marginTop: 16 }}>
-            {actions.length === 0 && (
+            {timeline.length === 0 && (
               <div className="cm" style={{ padding: "8px 0" }}>
                 No activity logged yet. Log a touch or add a note above.
               </div>
             )}
-            {actions.map((a) => (
-              <div
-                key={a.id}
-                className={`tl-item ${TOUCH_KINDS.includes(a.kind) ? "hot" : ""}`}
-              >
-                <div className="tl-dot" />
-                <div className="tl-body">
-                  <div className="tt">
-                    {a.kind === "note"
-                      ? a.note
-                      : `Logged ${a.kind}`}
+            {timeline.map((a) => {
+              const isNote = a.kind === "note";
+              const editing = editingId === a.id;
+              return (
+                <div
+                  key={a.id}
+                  className={`tl-item ${TOUCH_KINDS.includes(a.kind) ? "hot" : ""}`}
+                >
+                  <div className="tl-dot" />
+                  <div className="tl-body">
+                    {editing ? (
+                      <>
+                        <textarea
+                          className="ctx-add"
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          autoFocus
+                        />
+                        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                          <button
+                            className="ctx-addbtn"
+                            style={{ padding: "4px 12px", fontSize: 12 }}
+                            onClick={() => saveNoteEdit(a)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="ctx-del"
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="tt">
+                          {isNote ? a.note : `Logged ${a.kind}`}
+                        </div>
+                        <div className="tw">{fmtWhen(a.created_at)}</div>
+                      </>
+                    )}
                   </div>
-                  <div className="tw">{fmtWhen(a.created_at)}</div>
+                  {isNote && !editing && (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        className="ctx-del"
+                        onClick={() => {
+                          setEditingId(a.id);
+                          setEditingText(a.note ?? "");
+                        }}
+                        title="Edit note"
+                      >
+                        edit
+                      </button>
+                      <button
+                        className="ctx-del"
+                        onClick={() => deleteAction(a)}
+                        title="Delete note"
+                      >
+                        delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {!TOUCH_KINDS.includes(a.kind) && (
-                  <button
-                    className="ctx-del"
-                    onClick={() => toggleDone(a)}
-                    title="Toggle done"
-                  >
-                    {a.done ? "✓ done" : "mark done"}
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </aside>
