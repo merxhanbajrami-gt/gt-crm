@@ -45,13 +45,18 @@ export default function TopBar({ user }: { user: SessionUser }) {
         })}
       </nav>
       <div className="topbar-right">
-        <div className="userchip">
+        <Link
+          href="/account"
+          className="userchip"
+          style={{ textDecoration: "none", color: "inherit" }}
+          title="Account & password"
+        >
           <div className="utext" style={{ textAlign: "right" }}>
             <div className="uname">{user.fullName}</div>
             <div className="urole">{ROLE_LABEL[user.role] ?? user.role}</div>
           </div>
           <div className="avatar">{user.initials}</div>
-        </div>
+        </Link>
         <form action="/auth/signout" method="post">
           <button className="signout" type="submit">
             Sign out
