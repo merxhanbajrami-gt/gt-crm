@@ -5,9 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { fmtAge } from "@/lib/format";
 import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
 import { LEAD_SOURCES } from "@/lib/sources";
+import PersonSelect from "@/components/PersonSelect";
 import type { ActionItem, Deal, Stage } from "@/lib/types";
 
 const DAY = 86400000;
+// Cadence / "log a touch" hidden per Jul 2026 feedback (unsure it's needed).
+// Everything below stays wired up — flip this to bring the section back.
+const SHOW_CADENCE = false;
 
 export interface CurrentUser {
   id: string;
@@ -61,6 +65,11 @@ export default function DealDrawer({
   // inline note editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  // task editing
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [etObjective, setEtObjective] = useState("");
+  const [etDue, setEtDue] = useState("");
+  const [etAssignee, setEtAssignee] = useState("");
 
   function commitValue() {
     const n = Math.max(0, Math.round(Number(valueInput) || 0));
@@ -169,21 +178,22 @@ export default function DealDrawer({
   }
 
   // ---- tasks (kind='task') ----
+  // assigning to self also sets owner_id so it surfaces via either RLS path;
+  // assigning to another rep relies on the owner_code policy.
+  const ownerIdFor = (code: string) =>
+    code && code === currentUser.repCode ? currentUser.id : null;
+
   async function addTask() {
     const objective = taskNote.trim();
     if (!objective) return;
     setBusy(true);
-    // assign to self → also set owner_id so it surfaces via either RLS path;
-    // assigning to another rep relies on the owner_code policy.
-    const ownerId =
-      taskAssignee === currentUser.repCode ? currentUser.id : null;
     const { error } = await supabase.from("actions").insert({
       deal_id: d.id,
       kind: TASK_KIND,
       note: objective,
       due_date: taskDue || null,
       owner_code: taskAssignee || null,
-      owner_id: ownerId,
+      owner_id: ownerIdFor(taskAssignee),
       created_by: currentUser.id,
       done: false,
     });
@@ -194,6 +204,35 @@ export default function DealDrawer({
     }
     setTaskNote("");
     setTaskDue("");
+    await loadActions();
+  }
+
+  function startEditTask(t: ActionItem) {
+    setEditingTaskId(t.id);
+    setEtObjective(t.note ?? "");
+    setEtDue(t.due_date ?? "");
+    setEtAssignee(t.owner_code ?? "");
+  }
+
+  async function saveTaskEdit(t: ActionItem) {
+    const objective = etObjective.trim();
+    if (!objective) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from("actions")
+      .update({
+        note: objective,
+        due_date: etDue || null,
+        owner_code: etAssignee || null,
+        owner_id: ownerIdFor(etAssignee),
+      })
+      .eq("id", t.id);
+    setBusy(false);
+    setEditingTaskId(null);
+    if (error) {
+      alert("Could not save task: " + error.message);
+      return;
+    }
     await loadActions();
   }
 
@@ -234,6 +273,13 @@ export default function DealDrawer({
   const liveStage = d.stage !== "won" && d.stage !== "lost";
   const sIdx = stages.findIndex((x) => x.id === d.stage);
   const s = stages.find((x) => x.id === d.stage);
+
+  // keep the current owner visible in the reassign list even if they've since
+  // been removed from the active team (so their deals can still be reassigned)
+  const reassignOwners: [string, string][] =
+    d.owner_code && !owners.some(([c]) => c === d.owner_code)
+      ? [...owners, [d.owner_code, d.owner_name ?? d.owner_code]]
+      : owners;
 
   return (
     <>
@@ -426,7 +472,7 @@ export default function DealDrawer({
           </div>
 
           {/* cadence */}
-          {liveStage && (
+          {SHOW_CADENCE && liveStage && (
             <>
               <div className="dsection">Cadence</div>
               <div className="cadence">
@@ -480,7 +526,7 @@ export default function DealDrawer({
               onChange={(e) => reassign(e.target.value)}
             >
               {!d.owner_code && <option value="">Unassigned</option>}
-              {owners.map(([c, n]) => (
+              {reassignOwners.map(([c, n]) => (
                 <option key={c} value={c}>
                   {n} ({c})
                 </option>
@@ -514,19 +560,12 @@ export default function DealDrawer({
                 onChange={(e) => setTaskDue(e.target.value)}
                 title="Due date"
               />
-              <select
-                className="dedit"
+              <PersonSelect
+                owners={owners}
                 value={taskAssignee}
-                onChange={(e) => setTaskAssignee(e.target.value)}
-                title="Assignee"
-              >
-                <option value="">Unassigned</option>
-                {owners.map(([c, n]) => (
-                  <option key={c} value={c}>
-                    {n} ({c})
-                  </option>
-                ))}
-              </select>
+                onChange={setTaskAssignee}
+                placeholder="Assign to…"
+              />
             </div>
             <button
               className="ctx-addbtn"
@@ -547,6 +586,53 @@ export default function DealDrawer({
                 !t.done &&
                 t.due_date != null &&
                 t.due_date < today.toISOString().slice(0, 10);
+              const editing = editingTaskId === t.id;
+              if (editing) {
+                return (
+                  <div key={t.id} className="tl-item">
+                    <div className="tl-body" style={{ display: "grid", gap: 8 }}>
+                      <input
+                        className="dedit"
+                        value={etObjective}
+                        onChange={(e) => setEtObjective(e.target.value)}
+                        placeholder="Task objective"
+                        autoFocus
+                      />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <input
+                          className="dedit"
+                          type="date"
+                          value={etDue}
+                          onChange={(e) => setEtDue(e.target.value)}
+                          title="Due date"
+                        />
+                        <PersonSelect
+                          owners={owners}
+                          value={etAssignee}
+                          onChange={setEtAssignee}
+                          placeholder="Assign to…"
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          className="ctx-addbtn"
+                          style={{ padding: "4px 12px", fontSize: 12 }}
+                          disabled={busy || !etObjective.trim()}
+                          onClick={() => saveTaskEdit(t)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="ctx-del"
+                          onClick={() => setEditingTaskId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={t.id} className="tl-item">
                   <button
@@ -579,13 +665,22 @@ export default function DealDrawer({
                       {t.owner_code ? ` · ${t.owner_code}` : ""}
                     </div>
                   </div>
-                  <button
-                    className="ctx-del"
-                    onClick={() => deleteAction(t)}
-                    title="Delete task"
-                  >
-                    delete
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      className="ctx-del"
+                      onClick={() => startEditTask(t)}
+                      title="Edit task"
+                    >
+                      edit
+                    </button>
+                    <button
+                      className="ctx-del"
+                      onClick={() => deleteAction(t)}
+                      title="Delete task"
+                    >
+                      delete
+                    </button>
+                  </div>
                 </div>
               );
             })}

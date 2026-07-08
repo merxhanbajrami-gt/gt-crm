@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
+import { getActiveOwners } from "@/lib/owners";
 import { TASK_KIND } from "@/lib/cadence";
 import type { Stage } from "@/lib/types";
 import WeekList, { type TaskRow } from "./WeekList";
@@ -26,33 +27,21 @@ export default async function MyWeekPage() {
 
   // Open tasks assigned to the current user (RLS scopes reps to their own,
   // managers see the whole team). Each task carries its deal for context.
-  const [{ data: taskData }, { data: stageData }, { data: ownerData }] =
-    await Promise.all([
-      supabase
-        .from("actions")
-        .select(
-          "id, note, due_date, owner_code, deal:deals(id, company, dealname, value, hot)",
-        )
-        .eq("kind", TASK_KIND)
-        .eq("done", false)
-        .order("due_date", { ascending: true, nullsFirst: false })
-        .limit(1000),
-      supabase.from("stages").select("*").order("sort"),
-      supabase
-        .from("deals")
-        .select("owner_code, owner_name")
-        .not("owner_code", "is", null),
-    ]);
+  const [{ data: taskData }, { data: stageData }, owners] = await Promise.all([
+    supabase
+      .from("actions")
+      .select(
+        "id, note, due_date, owner_code, deal:deals(id, company, dealname, value, hot)",
+      )
+      .eq("kind", TASK_KIND)
+      .eq("done", false)
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .limit(1000),
+    supabase.from("stages").select("*").order("sort"),
+    getActiveOwners(supabase),
+  ]);
 
   const stages = (stageData ?? []) as Stage[];
-  const owners = Array.from(
-    new Map(
-      (ownerData ?? []).map((d) => [
-        d.owner_code as string,
-        (d.owner_name as string) || (d.owner_code as string),
-      ]),
-    ).entries(),
-  ).sort((a, b) => String(a[1]).localeCompare(String(b[1]))) as [string, string][];
 
   const rows: TaskRow[] = ((taskData ?? []) as unknown as TaskQueryRow[]).map(
     (t) => ({

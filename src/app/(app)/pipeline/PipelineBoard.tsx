@@ -13,16 +13,19 @@ export default function PipelineBoard({
   deals: initialDeals,
   owners,
   currentUser,
+  dealsWithTask = [],
   initialDealId = null,
 }: {
   stages: Stage[];
   deals: Deal[];
   owners: [string, string][];
   currentUser: CurrentUser;
+  dealsWithTask?: string[];
   initialDealId?: string | null;
 }) {
   const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
+  const withTask = useMemo(() => new Set(dealsWithTask), [dealsWithTask]);
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState("all");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -155,10 +158,13 @@ export default function PipelineBoard({
               <div className="kcards">
                 {ds.map((d) => {
                   const ac = ageClass(d);
+                  const noTask = d.stage !== "won" && !withTask.has(d.id);
                   return (
                     <div
                       key={d.id}
-                      className={`kcard${ac ? " age-" + ac : ""}`}
+                      className={`kcard${ac ? " age-" + ac : ""}${
+                        noTask ? " no-task" : ""
+                      }`}
                       draggable
                       onDragStart={() => setDragId(d.id)}
                       onDragEnd={() => setDragId(null)}
@@ -174,6 +180,11 @@ export default function PipelineBoard({
                           />
                         )}
                         {d.company}
+                        {noTask && (
+                          <span className="notask-chip" title="No active task">
+                            no task
+                          </span>
+                        )}
                       </div>
                       <div className="kval">
                         {d.value > 0 ? gbp(d.value) + " · " : ""}

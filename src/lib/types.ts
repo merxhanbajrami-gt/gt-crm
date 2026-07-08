@@ -85,6 +85,15 @@ export interface Idea {
   updated_at: string;
 }
 
+export interface TeamMember {
+  id: string;
+  name: string;
+  code: string | null;
+  email: string | null;
+  active: boolean;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;
