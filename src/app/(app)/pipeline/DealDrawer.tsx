@@ -41,6 +41,7 @@ export default function DealDrawer({
   currentUser,
   onClose,
   onChanged,
+  onDeleted,
 }: {
   deal: Deal;
   stages: Stage[];
@@ -48,6 +49,7 @@ export default function DealDrawer({
   currentUser: CurrentUser;
   onClose: () => void;
   onChanged: (d: Deal) => void;
+  onDeleted: (id: string) => void;
 }) {
   const supabase = createClient();
   const [d, setD] = useState<Deal>(deal);
@@ -134,6 +136,32 @@ export default function DealDrawer({
   function moveStage(stage: string) {
     if (stage === d.stage) return;
     patchDeal({ stage: stage as Deal["stage"], days_in_stage: 0 });
+  }
+
+  async function deleteDeal() {
+    if (
+      !confirm(
+        `Delete "${d.company}" permanently? This removes the deal and its tasks & notes, and can't be undone.`,
+      )
+    )
+      return;
+    setBusy(true);
+    // .select() so we can tell an RLS-blocked no-op from a real delete
+    const { data, error } = await supabase
+      .from("deals")
+      .delete()
+      .eq("id", d.id)
+      .select("id");
+    setBusy(false);
+    if (error) {
+      alert("Could not delete: " + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      alert("You don't have permission to delete this deal.");
+      return;
+    }
+    onDeleted(d.id);
   }
 
   function reassign(code: string) {
@@ -778,6 +806,23 @@ export default function DealDrawer({
                 </div>
               );
             })}
+          </div>
+
+          {/* danger zone */}
+          <div
+            style={{
+              marginTop: 28,
+              paddingTop: 16,
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            <button
+              className="deal-delete"
+              disabled={busy}
+              onClick={deleteDeal}
+            >
+              Delete deal
+            </button>
           </div>
         </div>
       </aside>

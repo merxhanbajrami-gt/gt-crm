@@ -245,6 +245,10 @@ export default function PipelineBoard({
               ds.map((x) => (x.id === updated.id ? updated : x)),
             )
           }
+          onDeleted={(id) => {
+            setDeals((ds) => ds.filter((x) => x.id !== id));
+            setSelectedId(null);
+          }}
         />
       )}
     </>
