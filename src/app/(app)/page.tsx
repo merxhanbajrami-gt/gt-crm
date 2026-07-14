@@ -42,6 +42,7 @@ export default async function MyWeekPage() {
   ]);
 
   const stages = (stageData ?? []) as Stage[];
+  const ownerMap = new Map(owners); // code → display name
 
   const rows: TaskRow[] = ((taskData ?? []) as unknown as TaskQueryRow[]).map(
     (t) => ({
@@ -49,6 +50,9 @@ export default async function MyWeekPage() {
       objective: t.note ?? "",
       due_date: t.due_date,
       owner_code: t.owner_code,
+      assignee: t.owner_code
+        ? (ownerMap.get(t.owner_code) ?? t.owner_code)
+        : null,
       dealId: t.deal?.id ?? null,
       company: t.deal?.company ?? null,
       dealname: t.deal?.dealname ?? null,

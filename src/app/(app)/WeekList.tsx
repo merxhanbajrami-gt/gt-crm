@@ -10,6 +10,7 @@ export interface TaskRow {
   objective: string;
   due_date: string | null; // YYYY-MM-DD
   owner_code: string | null;
+  assignee: string | null; // resolved display name
   dealId: string | null;
   company: string | null;
   dealname: string | null;
@@ -88,6 +89,20 @@ export default function WeekList({
     setRows((rs) => rs.filter((r) => r.id !== row.id));
   }
 
+  // reschedule a task's due date without opening the deal
+  async function reschedule(row: TaskRow, date: string) {
+    const next = date || null;
+    setRows((rs) =>
+      rs.map((r) => (r.id === row.id ? { ...r, due_date: next } : r)),
+    );
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("actions")
+      .update({ due_date: next })
+      .eq("id", row.id);
+    if (error) alert("Could not reschedule: " + error.message);
+  }
+
   return (
     <div className="panel">
       <div className="panel-head">
@@ -132,7 +147,11 @@ export default function WeekList({
             const { text, cls } = dueLabel(r.due_date);
             return (
               <div className="action-row" key={r.id}>
-                <span className="owner-dot" style={{ width: 30, height: 30 }}>
+                <span
+                  className="owner-dot"
+                  style={{ width: 30, height: 30 }}
+                  title={r.assignee ?? "Unassigned"}
+                >
                   {r.owner_code}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -158,9 +177,21 @@ export default function WeekList({
                       r.company || r.dealname || "—"
                     )}
                     {r.value > 0 ? ` · ${gbp(r.value)}` : ""}
+                    {" · "}
+                    {r.assignee ?? "Unassigned"}
                   </div>
                 </div>
-                <span className={`a-due ${cls}`}>{text}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    className="dedit"
+                    type="date"
+                    value={r.due_date ?? ""}
+                    onChange={(e) => reschedule(r, e.target.value)}
+                    title="Reschedule due date"
+                    style={{ padding: "5px 8px", fontSize: 12, width: 140 }}
+                  />
+                  <span className={`a-due ${cls}`}>{text}</span>
+                </div>
                 <button
                   className="cad-btn"
                   style={{ padding: "6px 12px", fontSize: 12 }}

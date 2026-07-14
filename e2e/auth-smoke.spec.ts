@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
-// Unauthenticated smoke tests. The app uses magic-link auth, so these cover the
-// public surface — which is exactly where our redirect regressions lived
-// (callback + signout pointing at the internal localhost:10000 behind Render's
-// proxy). The host assertions below would have caught both bugs.
+// Unauthenticated smoke tests covering the public surface — which is exactly
+// where our redirect regressions lived (callback + signout pointing at the
+// internal localhost:10000 behind Render's proxy). The host assertions below
+// would have caught both bugs.
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "https://gt-crm.onrender.com";
 const host = new URL(baseURL).host;
@@ -13,19 +13,20 @@ test.describe("login page", () => {
     await page.goto("/login");
     await expect(page.getByText("Your week, in one view.")).toBeVisible();
     await expect(page.getByPlaceholder("you@gt-hq.com")).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /sign-in link/i }),
+      page.getByRole("button", { name: /sign in/i }),
     ).toBeVisible();
   });
 
   test("blocks an invalid email client-side", async ({ page }) => {
     await page.goto("/login");
     await page.getByPlaceholder("you@gt-hq.com").fill("not-an-email");
-    await page.getByRole("button", { name: /sign-in link/i }).click();
-    // HTML5 validation stops submission: still on /login, no "check inbox" state
+    await page.getByRole("button", { name: /sign in/i }).click();
+    // HTML5 validation stops submission: still on /login, no error state
     await expect(page).toHaveURL(/\/login/);
     await expect(
-      page.getByRole("button", { name: /sign-in link/i }),
+      page.getByRole("button", { name: /sign in/i }),
     ).toBeVisible();
   });
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import LinkedInIcon from "@/components/LinkedInIcon";
 import type { Contact } from "@/lib/types";
 
 export const CONTACTS_PAGE = 200;
@@ -123,6 +124,7 @@ export default function ContactsTable({
               <tr key={c.id}>
                 <td>
                   {c.name}
+                  {c.linkedin_url && <LinkedInIcon url={c.linkedin_url} />}
                   {c.title ? (
                     <span style={{ color: "var(--text-faint)" }}>
                       {" "}

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { LEAD_SOURCES } from "@/lib/sources";
+import { normalizeUrl } from "@/components/LinkedInIcon";
+import PersonSelect from "@/components/PersonSelect";
 import type { Deal, Stage } from "@/lib/types";
 import type { CurrentUser } from "./DealDrawer";
 
@@ -22,7 +24,9 @@ export default function AddDealForm({
   const [company, setCompany] = useState("");
   const [dealname, setDealname] = useState("");
   const [contact, setContact] = useState("");
+  const [title, setTitle] = useState("");
   const [email, setEmail] = useState("");
+  const [linkedin, setLinkedin] = useState("");
   const [stage, setStage] = useState("connection");
   const [value, setValue] = useState("");
   const [vertical, setVertical] = useState("");
@@ -53,7 +57,9 @@ export default function AddDealForm({
         company: company.trim(),
         dealname: dealname.trim() || company.trim(),
         contact_name: contact.trim() || null,
+        title: title.trim() || null,
         email: email.trim() || null,
+        linkedin_url: normalizeUrl(linkedin) || null,
         stage,
         value: Math.max(0, Math.round(Number(value) || 0)),
         vertical: vertical.trim() || null,
@@ -72,7 +78,26 @@ export default function AddDealForm({
       setError(error.message);
       return;
     }
-    onCreated(data as Deal);
+    const deal = data as Deal;
+
+    // mirror the contact into the Contacts module, linked to the deal, so it's
+    // searchable there right away. Non-fatal: the deal exists either way.
+    if (contact.trim() || email.trim()) {
+      await supabase.from("contacts").insert({
+        deal_id: deal.id,
+        name: contact.trim() || null,
+        title: title.trim() || null,
+        email: email.trim() || null,
+        linkedin_url: normalizeUrl(linkedin) || null,
+        dealname: deal.dealname,
+        stage: deal.stage,
+        owner_code: deal.owner_code,
+        owner_id: deal.owner_id,
+        vertical: deal.vertical,
+        hot: deal.hot,
+      });
+    }
+    onCreated(deal);
   }
 
   const label = { fontSize: 11, fontWeight: 700, color: "var(--text-faint)" } as const;
@@ -141,14 +166,32 @@ export default function AddDealForm({
               />
             </div>
             <div>
-              <div style={label}>Email</div>
+              <div style={label}>Title</div>
               <input
                 className="dedit"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. VP Revenue"
               />
             </div>
+          </div>
+          <div>
+            <div style={label}>Email</div>
+            <input
+              className="dedit"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <div style={label}>LinkedIn</div>
+            <input
+              className="dedit"
+              value={linkedin}
+              onChange={(e) => setLinkedin(e.target.value)}
+              placeholder="linkedin.com/in/…"
+            />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
@@ -207,25 +250,12 @@ export default function AddDealForm({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Owner</div>
-              <select
-                className="dedit"
+              <PersonSelect
+                owners={owners}
                 value={ownerCode}
-                onChange={(e) => setOwnerCode(e.target.value)}
-              >
-                {currentUser.repCode && (
-                  <option value={currentUser.repCode}>
-                    {currentUser.fullName} (you)
-                  </option>
-                )}
-                <option value="">Unassigned</option>
-                {owners
-                  .filter(([c]) => c !== currentUser.repCode)
-                  .map(([c, n]) => (
-                    <option key={c} value={c}>
-                      {n} ({c})
-                    </option>
-                  ))}
-              </select>
+                onChange={setOwnerCode}
+                placeholder="Type a name…"
+              />
             </div>
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>

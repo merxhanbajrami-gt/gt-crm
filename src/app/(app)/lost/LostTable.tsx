@@ -1,10 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Deal } from "@/lib/types";
+import type { Deal, Stage } from "@/lib/types";
+import DealDrawer, { type CurrentUser } from "../pipeline/DealDrawer";
 
-export default function LostTable({ deals }: { deals: Deal[] }) {
+export default function LostTable({
+  deals: initial,
+  stages,
+  owners,
+  currentUser,
+}: {
+  deals: Deal[];
+  stages: Stage[];
+  owners: [string, string][];
+  currentUser: CurrentUser;
+}) {
+  const [deals, setDeals] = useState<Deal[]>(initial);
   const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = deals.find((d) => d.id === selectedId) ?? null;
+
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return deals;
@@ -40,7 +55,11 @@ export default function LostTable({ deals }: { deals: Deal[] }) {
           </thead>
           <tbody>
             {rows.map((d) => (
-              <tr key={d.id}>
+              <tr
+                key={d.id}
+                onClick={() => setSelectedId(d.id)}
+                style={{ cursor: "pointer" }}
+              >
                 <td>{d.dealname || d.company}</td>
                 <td>{d.owner_name || d.owner_code || "—"}</td>
                 <td>{d.vertical || "Unassigned"}</td>
@@ -51,6 +70,28 @@ export default function LostTable({ deals }: { deals: Deal[] }) {
           </tbody>
         </table>
       </div>
+
+      {selected && (
+        <DealDrawer
+          key={selected.id}
+          deal={selected}
+          stages={stages}
+          owners={owners}
+          currentUser={currentUser}
+          onClose={() => setSelectedId(null)}
+          onChanged={(u) =>
+            setDeals((ds) =>
+              u.stage !== "lost"
+                ? ds.filter((x) => x.id !== u.id) // reopened → leaves the Lost list
+                : ds.map((x) => (x.id === u.id ? u : x)),
+            )
+          }
+          onDeleted={(id) => {
+            setDeals((ds) => ds.filter((x) => x.id !== id));
+            setSelectedId(null);
+          }}
+        />
+      )}
     </>
   );
 }

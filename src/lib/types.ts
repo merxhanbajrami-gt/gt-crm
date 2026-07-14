@@ -26,6 +26,7 @@ export interface Deal {
   title: string | null;
   email: string | null;
   phone: string | null;
+  linkedin_url: string | null;
   stage: StageId;
   value: number;
   days_in_stage: number;
@@ -54,6 +55,8 @@ export interface Contact {
   dealname: string | null;
   hot: boolean;
   vertical: string | null;
+  deal_id: string | null;
+  linkedin_url: string | null;
 }
 
 export interface ActionItem {
