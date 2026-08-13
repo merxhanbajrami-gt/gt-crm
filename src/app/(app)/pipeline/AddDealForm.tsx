@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { LEAD_SOURCES } from "@/lib/sources";
 import { normalizeUrl } from "@/components/LinkedInIcon";
 import PersonSelect from "@/components/PersonSelect";
+import CompanySelect from "@/components/CompanySelect";
 import type { Deal, Stage } from "@/lib/types";
 import type { CurrentUser } from "./DealDrawer";
 
@@ -22,6 +23,7 @@ export default function AddDealForm({
   onCreated: (d: Deal) => void;
 }) {
   const [company, setCompany] = useState("");
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [dealname, setDealname] = useState("");
   const [contact, setContact] = useState("");
   const [title, setTitle] = useState("");
@@ -51,10 +53,33 @@ export default function AddDealForm({
         : (owners.find(([c]) => c === ownerCode)?.[1] ?? null);
 
     const supabase = createClient();
+
+    // resolve the company link: picked from the book, matched by name, or
+    // created fresh. Non-fatal — the deal is created either way.
+    let cid = companyId;
+    if (!cid) {
+      const { data: existing } = await supabase
+        .from("companies")
+        .select("id")
+        .ilike("name", company.trim())
+        .limit(1)
+        .maybeSingle();
+      cid = existing?.id ?? null;
+    }
+    if (!cid) {
+      const { data: created } = await supabase
+        .from("companies")
+        .insert({ name: company.trim() })
+        .select("id")
+        .single();
+      cid = created?.id ?? null;
+    }
+
     const { data, error } = await supabase
       .from("deals")
       .insert({
         company: company.trim(),
+        company_id: cid,
         dealname: dealname.trim() || company.trim(),
         contact_name: contact.trim() || null,
         title: title.trim() || null,
@@ -139,13 +164,21 @@ export default function AddDealForm({
         <form onSubmit={submit} style={{ display: "grid", gap: 12 }}>
           <div>
             <div style={label}>Company *</div>
-            <input
-              className="dedit"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
+            <CompanySelect
+              name={company}
+              onChange={(name, id) => {
+                setCompany(name);
+                setCompanyId(id);
+              }}
               placeholder="Acme Corp"
-              autoFocus
             />
+            {company.trim() && !companyId && (
+              <div
+                style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}
+              >
+                Not in the company book yet — it&apos;ll be added.
+              </div>
+            )}
           </div>
           <div>
             <div style={label}>Deal name</div>

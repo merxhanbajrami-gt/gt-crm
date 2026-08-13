@@ -9,10 +9,10 @@ test.describe.configure({ mode: "serial" });
 // create is named with TEST_DEAL_PREFIX and wiped in afterAll so prod stays clean.
 
 test.afterAll(async () => {
-  await adminClient()
-    .from("deals")
-    .delete()
-    .like("company", `${TEST_DEAL_PREFIX}%`);
+  const admin = adminClient();
+  await admin.from("deals").delete().like("company", `${TEST_DEAL_PREFIX}%`);
+  // the Add-deal company type-ahead also creates a company-book entry
+  await admin.from("companies").delete().like("name", `${TEST_DEAL_PREFIX}%`);
 });
 
 test.describe("My Week", () => {
@@ -47,6 +47,29 @@ test.describe("Pipeline", () => {
     // active flow columns render (Lost lives under its own tab, not here)
     await expect(page.getByText("Connection")).toBeVisible();
     await expect(page.getByText("Won")).toBeVisible();
+  });
+});
+
+test.describe("Companies", () => {
+  test("book lists imported companies and opens the company record", async ({
+    page,
+  }) => {
+    await page.goto("/companies");
+    await expect(
+      page.getByRole("heading", { name: "Companies" }),
+    ).toBeVisible();
+
+    // search the whole book for a company imported from HubSpot
+    await page.getByPlaceholder(/search companies/i).fill("Cyera");
+    const cell = page.getByRole("cell", { name: /cyera/i }).first();
+    await expect(cell).toBeVisible();
+
+    // row opens the company record with its deals / contacts / notes sections
+    await cell.click();
+    await expect(page.getByText("Company record")).toBeVisible();
+    await expect(page.getByText(/^Deals \(/)).toBeVisible();
+    await expect(page.getByText(/^Contacts \(/)).toBeVisible();
+    await expect(page.getByText(/^Notes \(/)).toBeVisible();
   });
 });
 

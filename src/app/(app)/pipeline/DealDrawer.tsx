@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { fmtAge } from "@/lib/format";
 import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
 import { LEAD_SOURCES } from "@/lib/sources";
 import PersonSelect from "@/components/PersonSelect";
+import CompanySelect from "@/components/CompanySelect";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
 import type { ActionItem, Contact, Deal, Stage } from "@/lib/types";
 
@@ -59,6 +61,7 @@ export default function DealDrawer({
   const [busy, setBusy] = useState(false);
   const [valueInput, setValueInput] = useState(String(deal.value || ""));
   const [verticalInput, setVerticalInput] = useState(deal.vertical ?? "");
+  const [companyInput, setCompanyInput] = useState(deal.company ?? "");
   // editable contact fields
   const [contactInput, setContactInput] = useState(deal.contact_name ?? "");
   const [titleInput, setTitleInput] = useState(deal.title ?? "");
@@ -255,6 +258,24 @@ export default function DealDrawer({
       return;
     }
     onDeleted(d.id);
+  }
+
+  // link the deal to a company from the book, creating the record if needed
+  async function createAndLinkCompany(name: string) {
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("companies")
+      .insert({ name })
+      .select("id, name")
+      .single();
+    setBusy(false);
+    if (error) {
+      alert("Could not create company: " + error.message);
+      setCompanyInput(d.company ?? "");
+      return;
+    }
+    setCompanyInput(data.name);
+    patchDeal({ company: data.name, company_id: data.id });
   }
 
   function reassign(code: string) {
@@ -495,6 +516,36 @@ export default function DealDrawer({
 
           {/* details */}
           <div className="dgrid">
+            <div className="dfield">
+              <div className="fl">
+                Company
+                {d.company_id && (
+                  <Link
+                    href={`/companies?company=${d.company_id}`}
+                    style={{
+                      marginLeft: 6,
+                      fontSize: 10,
+                      color: "var(--gt-blue)",
+                      textDecoration: "none",
+                      fontWeight: 700,
+                    }}
+                    title="Open the company record"
+                  >
+                    open ↗
+                  </Link>
+                )}
+              </div>
+              <CompanySelect
+                name={companyInput}
+                onChange={(name, id) => {
+                  setCompanyInput(name);
+                  if (id) patchDeal({ company: name, company_id: id });
+                }}
+                onCreatePick={createAndLinkCompany}
+                onDismiss={() => setCompanyInput(d.company ?? "")}
+                placeholder="Link a company…"
+              />
+            </div>
             <div className="dfield">
               <div className="fl">Contact name</div>
               <input

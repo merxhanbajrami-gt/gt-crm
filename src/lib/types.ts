@@ -35,6 +35,7 @@ export interface Deal {
   owner_id: string | null;
   vertical: string | null;
   source: string | null;
+  company_id: string | null;
   first_touch_date: string | null;
   close_date: string | null;
   hot: boolean;
@@ -56,12 +57,37 @@ export interface Contact {
   hot: boolean;
   vertical: string | null;
   deal_id: string | null;
+  company_id: string | null;
   linkedin_url: string | null;
+}
+
+export interface Company {
+  id: string;
+  legacy_id: number | null;
+  name: string;
+  owner_code: string | null;
+  owner_name: string | null;
+  phone: string | null;
+  city: string | null;
+  country: string | null;
+  industry: string | null;
+  last_activity: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// a v_companies row: company + its deal/contact counts
+export interface CompanyRow extends Company {
+  deal_count: number;
+  contact_count: number;
 }
 
 export interface ActionItem {
   id: string;
   deal_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  legacy_id: number | null;
   owner_id: string | null;
   owner_code: string | null;
   created_by: string | null;

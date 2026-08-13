@@ -32,7 +32,14 @@ test.describe("login page", () => {
 });
 
 test.describe("auth guard", () => {
-  for (const path of ["/", "/pipeline", "/contacts", "/scorecard", "/lost"]) {
+  for (const path of [
+    "/",
+    "/pipeline",
+    "/contacts",
+    "/companies",
+    "/scorecard",
+    "/lost",
+  ]) {
     test(`unauthenticated ${path} redirects to /login`, async ({ page }) => {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login/);
