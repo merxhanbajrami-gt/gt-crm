@@ -7,8 +7,8 @@ interface StageRow {
   count: number;
   value: number;
 }
-interface VerticalRow {
-  vertical: string;
+interface ClientTypeRow {
+  client_type: string;
   count: number;
 }
 interface SourceRow {
@@ -66,20 +66,20 @@ function Bar({
 
 export default async function ScorecardPage() {
   const supabase = await createClient();
-  const [{ data: summary }, { data: byStage }, { data: byVertical }, { data: bySource }] =
+  const [{ data: summary }, { data: byStage }, { data: byClientType }, { data: bySource }] =
     await Promise.all([
       supabase.rpc("scorecard_summary"),
       supabase.from("v_pipeline_by_stage").select("*"),
-      supabase.from("v_pipeline_by_vertical").select("*").limit(8),
+      supabase.from("v_pipeline_by_client_type").select("*").limit(8),
       supabase.from("v_deals_by_source").select("*").limit(8),
     ]);
 
   const s = (summary ?? {}) as Record<string, number>;
   const stages = (byStage ?? []) as StageRow[];
-  const verticals = (byVertical ?? []) as VerticalRow[];
+  const clientTypes = (byClientType ?? []) as ClientTypeRow[];
   const sources = (bySource ?? []) as SourceRow[];
   const maxStage = Math.max(1, ...stages.map((r) => r.count));
-  const maxVert = Math.max(1, ...verticals.map((r) => r.count));
+  const maxType = Math.max(1, ...clientTypes.map((r) => r.count));
   const maxSource = Math.max(1, ...sources.map((r) => r.count));
 
   const bignums = [
@@ -127,15 +127,15 @@ export default async function ScorecardPage() {
         </div>
 
         <div className="chartcard">
-          <h3>Open cards by vertical</h3>
-          <div className="chsub">Where the pipeline concentrates</div>
+          <h3>Open cards by client type</h3>
+          <div className="chsub">New business vs existing clients</div>
           <div style={{ marginTop: 14 }}>
-            {verticals.map((r) => (
+            {clientTypes.map((r) => (
               <Bar
-                key={r.vertical}
-                label={r.vertical}
+                key={r.client_type}
+                label={r.client_type}
                 value={r.count}
-                max={maxVert}
+                max={maxType}
                 color="var(--gt-blue)"
               />
             ))}

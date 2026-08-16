@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { fmtAge } from "@/lib/format";
+import { fmtAge, quietDays } from "@/lib/format";
 import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
-import { LEAD_SOURCES } from "@/lib/sources";
+import { CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
 import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
@@ -60,7 +60,6 @@ export default function DealDrawer({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [valueInput, setValueInput] = useState(String(deal.value || ""));
-  const [verticalInput, setVerticalInput] = useState(deal.vertical ?? "");
   const [companyInput, setCompanyInput] = useState(deal.company ?? "");
   // editable contact fields
   const [contactInput, setContactInput] = useState(deal.contact_name ?? "");
@@ -93,9 +92,8 @@ export default function DealDrawer({
     const n = Math.max(0, Math.round(Number(valueInput) || 0));
     if (n !== d.value) patchDeal({ value: n });
   }
-  function commitVertical() {
-    const v = verticalInput.trim();
-    if (v !== (d.vertical ?? "")) patchDeal({ vertical: v || null });
+  function commitClientType(v: string) {
+    if (v !== (d.client_type ?? "")) patchDeal({ client_type: v || null });
   }
   function commitSource(v: string) {
     if (v !== (d.source ?? "")) patchDeal({ source: v || null });
@@ -171,7 +169,6 @@ export default function DealDrawer({
       stage: d.stage,
       owner_code: d.owner_code,
       owner_id: d.owner_id,
-      vertical: d.vertical,
       hot: d.hot,
     });
     setBusy(false);
@@ -219,7 +216,10 @@ export default function DealDrawer({
     if (stage === d.stage) return;
     const from = stages.find((x) => x.id === d.stage)?.name ?? d.stage;
     const to = stages.find((x) => x.id === stage)?.name ?? stage;
-    const ok = await patchDeal({ stage: stage as Deal["stage"], days_in_stage: 0 });
+    const ok = await patchDeal({
+      stage: stage as Deal["stage"],
+      last_touched_at: new Date().toISOString(),
+    });
     if (!ok) return;
     // keep linked contacts' stage in step (the Contacts page filters on it)
     await supabase.from("contacts").update({ stage }).eq("deal_id", d.id);
@@ -295,6 +295,14 @@ export default function DealDrawer({
     });
   }
 
+  // logging any activity un-quiets the deal (DB trigger updates the row;
+  // mirror it locally so "Quiet for" and the board refresh right away)
+  function bumpTouched() {
+    const next = { ...d, last_touched_at: new Date().toISOString() };
+    setD(next);
+    onChanged(next);
+  }
+
   // ---- activity (actions table) ----
   async function addAction(kind: string, text: string | null) {
     setBusy(true);
@@ -311,6 +319,7 @@ export default function DealDrawer({
       alert("Could not save: " + error.message);
       return;
     }
+    bumpTouched();
     await loadActions();
   }
 
@@ -346,6 +355,7 @@ export default function DealDrawer({
     }
     setTaskNote("");
     setTaskDue("");
+    bumpTouched();
     await loadActions();
   }
 
@@ -405,10 +415,11 @@ export default function DealDrawer({
 
   // ---- cadence (shared logic with My Week) ----
   const touches = timeline.filter((a) => TOUCH_KINDS.includes(a.kind));
+  const quiet = quietDays(d.last_touched_at);
   const { cadence, lastTouch, nextTouch, daysOverdue } = touchStatus(
     d.stage,
     touches[0]?.created_at ?? null,
-    d.days_in_stage,
+    quiet,
   );
   const today = new Date();
   const overdue = daysOverdue > 0;
@@ -601,23 +612,26 @@ export default function DealDrawer({
               <div className="fv">
                 {d.stage === "won"
                   ? "Won"
-                  : d.days_in_stage
-                    ? fmtAge(d.days_in_stage)
-                    : "No date"}
+                  : quiet >= 1
+                    ? fmtAge(quiet)
+                    : "Active today"}
               </div>
             </div>
             <div className="dfield">
-              <div className="fl">Vertical</div>
-              <input
+              <div className="fl">Client type</div>
+              <select
                 className="dedit"
-                type="text"
-                value={verticalInput}
+                value={d.client_type ?? ""}
                 disabled={busy}
-                onChange={(e) => setVerticalInput(e.target.value)}
-                onBlur={commitVertical}
-                onKeyDown={(e) => e.key === "Enter" && commitVertical()}
-                placeholder="Unassigned"
-              />
+                onChange={(e) => commitClientType(e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {CLIENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="dfield">
               <div className="fl">Email</div>

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ageClass, fmtAge, gbp } from "@/lib/format";
+import { ageClass, fmtAge, gbp, quietDays } from "@/lib/format";
 import type { Deal, Stage } from "@/lib/types";
 import DealDrawer, { type CurrentUser } from "./DealDrawer";
 import AddDealForm from "./AddDealForm";
@@ -45,7 +45,7 @@ export default function PipelineBoard({
           d.contact_name,
           d.title,
           d.email,
-          d.vertical,
+          d.client_type,
           d.owner_code,
           d.owner_name,
         ]
@@ -59,18 +59,19 @@ export default function PipelineBoard({
   async function restage(dealId: string, stage: string) {
     const deal = deals.find((d) => d.id === dealId);
     if (!deal || deal.stage === stage) return;
-    // optimistic
+    // optimistic; the DB trigger stamps last_touched_at on the stage change
+    const touched = new Date().toISOString();
     setDeals((ds) =>
       ds.map((d) =>
         d.id === dealId
-          ? { ...d, stage: stage as Deal["stage"], days_in_stage: 0 }
+          ? { ...d, stage: stage as Deal["stage"], last_touched_at: touched }
           : d,
       ),
     );
     const supabase = createClient();
     const { error } = await supabase
       .from("deals")
-      .update({ stage, days_in_stage: 0 })
+      .update({ stage })
       .eq("id", dealId);
     if (error) {
       // revert on failure
@@ -115,7 +116,7 @@ export default function PipelineBoard({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search deals, companies, contacts, verticals, owners"
+          placeholder="Search deals, companies, contacts, client types, owners"
           aria-label="Search the pipeline"
         />
       </div>
@@ -158,6 +159,7 @@ export default function PipelineBoard({
               <div className="kcards">
                 {ds.map((d) => {
                   const ac = ageClass(d);
+                  const quiet = quietDays(d.last_touched_at);
                   const noTask = d.stage !== "won" && !withTask.has(d.id);
                   return (
                     <div
@@ -188,15 +190,15 @@ export default function PipelineBoard({
                       </div>
                       <div className="kval">
                         {d.value > 0 ? gbp(d.value) + " · " : ""}
-                        {d.vertical || "Unassigned"}
+                        {d.client_type || "Unassigned"}
                       </div>
                       <div className="kfoot">
                         <span className={`kage ${ac}`}>
                           {d.stage === "won"
                             ? "won"
-                            : d.days_in_stage
-                              ? fmtAge(d.days_in_stage) + " quiet"
-                              : "no activity logged"}
+                            : quiet >= 1
+                              ? fmtAge(quiet) + " quiet"
+                              : "active today"}
                         </span>
                         <span
                           className="owner-dot"

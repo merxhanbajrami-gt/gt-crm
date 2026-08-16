@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { LEAD_SOURCES } from "@/lib/sources";
+import { CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
 import { normalizeUrl } from "@/components/LinkedInIcon";
 import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
@@ -31,7 +31,7 @@ export default function AddDealForm({
   const [linkedin, setLinkedin] = useState("");
   const [stage, setStage] = useState("connection");
   const [value, setValue] = useState("");
-  const [vertical, setVertical] = useState("");
+  const [clientType, setClientType] = useState("");
   const [source, setSource] = useState("");
   const [ownerCode, setOwnerCode] = useState(currentUser.repCode ?? "");
   const [hot, setHot] = useState(false);
@@ -80,20 +80,25 @@ export default function AddDealForm({
       .insert({
         company: company.trim(),
         company_id: cid,
-        dealname: dealname.trim() || company.trim(),
+        // "Boots – John Smith" by default, so deals with several contacts at
+        // the same company stay tellable apart (Oleksandr, Aug 2026)
+        dealname:
+          dealname.trim() ||
+          (contact.trim()
+            ? `${company.trim()} – ${contact.trim()}`
+            : company.trim()),
         contact_name: contact.trim() || null,
         title: title.trim() || null,
         email: email.trim() || null,
         linkedin_url: normalizeUrl(linkedin) || null,
         stage,
         value: Math.max(0, Math.round(Number(value) || 0)),
-        vertical: vertical.trim() || null,
+        client_type: clientType || null,
         source: source || null,
         owner_code: ownerCode || null,
         owner_name: ownerName,
         owner_id: ownerCode === currentUser.repCode ? currentUser.id : null,
         hot,
-        days_in_stage: 0,
       })
       .select()
       .single();
@@ -118,7 +123,6 @@ export default function AddDealForm({
         stage: deal.stage,
         owner_code: deal.owner_code,
         owner_id: deal.owner_id,
-        vertical: deal.vertical,
         hot: deal.hot,
       });
     }
@@ -186,7 +190,7 @@ export default function AddDealForm({
               className="dedit"
               value={dealname}
               onChange={(e) => setDealname(e.target.value)}
-              placeholder="Defaults to company"
+              placeholder="Defaults to Company – Contact"
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -257,12 +261,19 @@ export default function AddDealForm({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <div style={label}>Vertical</div>
-              <input
+              <div style={label}>Client type</div>
+              <select
                 className="dedit"
-                value={vertical}
-                onChange={(e) => setVertical(e.target.value)}
-              />
+                value={clientType}
+                onChange={(e) => setClientType(e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {CLIENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <div style={label}>Lead source</div>

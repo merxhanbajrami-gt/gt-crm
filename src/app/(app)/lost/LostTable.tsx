@@ -24,7 +24,7 @@ export default function LostTable({
     const term = q.trim().toLowerCase();
     if (!term) return deals;
     return deals.filter((d) =>
-      [d.company, d.dealname, d.owner_code, d.owner_name, d.vertical]
+      [d.company, d.dealname, d.owner_code, d.owner_name, d.client_type]
         .join(" ")
         .toLowerCase()
         .includes(term),
@@ -39,7 +39,7 @@ export default function LostTable({
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search lost deals, companies, owners, verticals"
+          placeholder="Search lost deals, companies, owners, client types"
         />
       </div>
       <div className="panel" style={{ overflowX: "auto" }}>
@@ -48,7 +48,7 @@ export default function LostTable({
             <tr>
               <th>Deal</th>
               <th>Owner</th>
-              <th>Vertical</th>
+              <th>Client type</th>
               <th>Contacts</th>
               <th>Last activity</th>
             </tr>
@@ -62,7 +62,7 @@ export default function LostTable({
               >
                 <td>{d.dealname || d.company}</td>
                 <td>{d.owner_name || d.owner_code || "—"}</td>
-                <td>{d.vertical || "Unassigned"}</td>
+                <td>{d.client_type || "Unassigned"}</td>
                 <td>{d.n_contacts}</td>
                 <td>{d.last_activity || "No recent activity logged"}</td>
               </tr>

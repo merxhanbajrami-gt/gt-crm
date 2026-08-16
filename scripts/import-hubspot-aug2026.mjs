@@ -189,7 +189,7 @@ report.lists["new deals"] = newDeals.map(
 out += `-- ---------- deals: insert (${newDeals.length} new at generation time) ----------\n`;
 for (const batch of chunk(deals, 250)) {
   out += `insert into public.deals
-  (legacy_id, company, dealname, contact_name, stage, value, owner_code, owner_name, vertical, source, hot, last_activity, close_date, created_at)
+  (legacy_id, company, dealname, contact_name, stage, value, owner_code, owner_name, client_type, source, hot, last_activity, close_date, created_at)
 values\n`;
   out += batch
     .map((d) => {
@@ -199,10 +199,15 @@ values\n`;
       const closed = stage === "won" || stage === "lost";
       const closeDate = closed && d["Close Date"] ? sq(d["Close Date"].slice(0, 10)) : "null";
       const created = d["Create Date"] ? sq(d["Create Date"]) : "now()";
+      // HubSpot "Deal Type" -> client_type (renamed from vertical in 0014)
+      const clientType =
+        { "New Business": "New Client", "Existing Business": "Existing Client" }[
+          d["Deal Type"]
+        ] ?? (d["Deal Type"] || null);
       return `  (${num(d["Record ID"])}, ${sq(company)}, ${sq(d["Deal Name"])}, ${sq(contact)}, ${sq(
         stage,
       )}, ${dealValue(d["Amount"])}, ${sq(code)}, ${sq(name)}, ${sq(
-        d["Deal Type"] || null,
+        clientType,
       )}, null, false, ${sq(d["Last Activity Date"] || null)}, ${closeDate}, ${created})`;
     })
     .join(",\n");
@@ -332,7 +337,7 @@ for (const x of drift) {
   const closed = x.next === "won" || x.next === "lost";
   const closeSet =
     closed && x.close ? `, close_date = coalesce(close_date, ${sq(x.close.slice(0, 10))})` : "";
-  out += `update public.deals set stage = ${sq(x.next)}, days_in_stage = 0${closeSet}
+  out += `update public.deals set stage = ${sq(x.next)}${closeSet}
   where legacy_id = ${x.lid} and stage = ${sq(x.prev)};\n`;
 }
 

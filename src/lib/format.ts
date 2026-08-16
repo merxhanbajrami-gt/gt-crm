@@ -9,10 +9,19 @@ export function fmtAge(days: number): string {
   return days + "d";
 }
 
+// whole days since the deal was last touched (stage move or logged activity —
+// DB triggers keep deals.last_touched_at fresh, see migration 0014)
+export function quietDays(lastTouchedAt: string | null): number {
+  if (!lastTouchedAt) return 0;
+  const ms = Date.now() - new Date(lastTouchedAt).getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+}
+
 // quiet-time severity, mirrors the prototype: 90+ days = stuck, 30+ = warn
-export function ageClass(d: Pick<Deal, "stage" | "days_in_stage">): string {
+export function ageClass(d: Pick<Deal, "stage" | "last_touched_at">): string {
   if (d.stage === "won") return "";
-  if (d.days_in_stage >= 90) return "stuck";
-  if (d.days_in_stage >= 30) return "warn";
+  const q = quietDays(d.last_touched_at);
+  if (q >= 90) return "stuck";
+  if (q >= 30) return "warn";
   return "";
 }

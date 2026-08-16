@@ -29,11 +29,11 @@ export interface Deal {
   linkedin_url: string | null;
   stage: StageId;
   value: number;
-  days_in_stage: number;
+  last_touched_at: string;
   owner_code: string | null;
   owner_name: string | null;
   owner_id: string | null;
-  vertical: string | null;
+  client_type: string | null;
   source: string | null;
   company_id: string | null;
   first_touch_date: string | null;
