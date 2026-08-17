@@ -60,6 +60,7 @@ export default function DealDrawer({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [valueInput, setValueInput] = useState(String(deal.value || ""));
+  const [dealnameInput, setDealnameInput] = useState(deal.dealname ?? "");
   const [companyInput, setCompanyInput] = useState(deal.company ?? "");
   // editable contact fields
   const [contactInput, setContactInput] = useState(deal.contact_name ?? "");
@@ -94,6 +95,11 @@ export default function DealDrawer({
   }
   function commitClientType(v: string) {
     if (v !== (d.client_type ?? "")) patchDeal({ client_type: v || null });
+  }
+  // cleared name falls back to the company on the board (dealname || company)
+  function commitDealname() {
+    const v = dealnameInput.trim();
+    if (v !== (d.dealname ?? "")) patchDeal({ dealname: v || null });
   }
   function commitSource(v: string) {
     if (v !== (d.source ?? "")) patchDeal({ source: v || null });
@@ -527,6 +533,19 @@ export default function DealDrawer({
 
           {/* details */}
           <div className="dgrid">
+            <div className="dfield">
+              <div className="fl">Deal name</div>
+              <input
+                className="dedit"
+                type="text"
+                value={dealnameInput}
+                disabled={busy}
+                onChange={(e) => setDealnameInput(e.target.value)}
+                onBlur={commitDealname}
+                onKeyDown={(e) => e.key === "Enter" && commitDealname()}
+                placeholder={d.company ?? "—"}
+              />
+            </div>
             <div className="dfield">
               <div className="fl">
                 Company
