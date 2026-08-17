@@ -8,11 +8,13 @@ export default function LostTable({
   deals: initial,
   stages,
   owners,
+  assignees,
   currentUser,
 }: {
   deals: Deal[];
   stages: Stage[];
   owners: [string, string][];
+  assignees: [string, string][];
   currentUser: CurrentUser;
 }) {
   const [deals, setDeals] = useState<Deal[]>(initial);
@@ -77,6 +79,7 @@ export default function LostTable({
           deal={selected}
           stages={stages}
           owners={owners}
+          assignees={assignees}
           currentUser={currentUser}
           onClose={() => setSelectedId(null)}
           onChanged={(u) =>

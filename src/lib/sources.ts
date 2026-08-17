@@ -14,6 +14,7 @@ export const LEAD_SOURCES = [
   "Oleksandr K",
   "Internal Referral",
   "External Referral",
+  "Client Referral",
   "Event",
   "Partner",
   "Existing Client",

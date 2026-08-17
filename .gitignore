@@ -56,3 +56,5 @@ all-contacts.csv
 /blob-report/
 /playwright/.cache/
 /e2e/.auth/
+GT-Contacts*.xlsx
+contacts-cleaned-*.csv

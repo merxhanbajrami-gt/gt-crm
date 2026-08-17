@@ -17,3 +17,21 @@ export async function getActiveOwners(
     m.name,
   ]);
 }
+
+// Subset of the active team that tasks can be assigned to — the owner list
+// also carries sourcing partners who own deals but don't work tasks.
+export async function getTaskAssignees(
+  supabase: SupabaseClient,
+): Promise<[string, string][]> {
+  const { data } = await supabase
+    .from("team_members")
+    .select("code, name")
+    .eq("active", true)
+    .eq("task_assignee", true)
+    .not("code", "is", null)
+    .order("name");
+  return ((data ?? []) as { code: string; name: string }[]).map((m) => [
+    m.code,
+    m.name,
+  ]);
+}

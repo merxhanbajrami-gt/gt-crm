@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
-import { getActiveOwners } from "@/lib/owners";
+import { getActiveOwners, getTaskAssignees } from "@/lib/owners";
 import { TASK_KIND } from "@/lib/cadence";
 import type { Deal, Stage } from "@/lib/types";
 import PipelineBoard from "./PipelineBoard";
@@ -14,7 +14,7 @@ export default async function PipelinePage({
   const supabase = await createClient();
   const user = await getSessionUser();
 
-  const [{ data: stages }, { data: deals }, { data: openTasks }, owners] =
+  const [{ data: stages }, { data: deals }, { data: openTasks }, owners, assignees] =
     await Promise.all([
       supabase.from("stages").select("*").order("sort"),
       supabase.from("deals").select("*").order("value", { ascending: false }),
@@ -24,8 +24,9 @@ export default async function PipelinePage({
         .select("deal_id")
         .eq("kind", TASK_KIND)
         .eq("done", false),
-      // assignable people come from the curated team list (active only)
+      // owners = curated team list (active); assignees = the task-taking subset
       getActiveOwners(supabase),
+      getTaskAssignees(supabase),
     ]);
 
   // The board is the working pipeline; lost deals live under the dedicated
@@ -55,6 +56,7 @@ export default async function PipelinePage({
         stages={boardStages as Stage[]}
         deals={boardDeals as Deal[]}
         owners={owners as [string, string][]}
+        assignees={assignees as [string, string][]}
         dealsWithTask={dealsWithTask}
         initialDealId={initialDealId ?? null}
         currentUser={{

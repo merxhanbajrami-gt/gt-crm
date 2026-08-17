@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
-import { getActiveOwners } from "@/lib/owners";
+import { getActiveOwners, getTaskAssignees } from "@/lib/owners";
 import type { Deal, Stage } from "@/lib/types";
 import LostTable from "./LostTable";
 
@@ -8,10 +8,11 @@ export default async function LostPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
 
-  const [{ data }, { data: stageData }, owners] = await Promise.all([
+  const [{ data }, { data: stageData }, owners, assignees] = await Promise.all([
     supabase.from("deals").select("*").eq("stage", "lost").order("company"),
     supabase.from("stages").select("*").order("sort"),
     getActiveOwners(supabase),
+    getTaskAssignees(supabase),
   ]);
 
   return (
@@ -26,6 +27,7 @@ export default async function LostPage() {
         deals={(data ?? []) as Deal[]}
         stages={(stageData ?? []) as Stage[]}
         owners={owners}
+        assignees={assignees}
         currentUser={{
           id: user!.id,
           fullName: user!.fullName,

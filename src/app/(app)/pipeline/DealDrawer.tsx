@@ -41,6 +41,7 @@ export default function DealDrawer({
   deal,
   stages,
   owners,
+  assignees,
   currentUser,
   onClose,
   onChanged,
@@ -49,6 +50,8 @@ export default function DealDrawer({
   deal: Deal;
   stages: Stage[];
   owners: [string, string][];
+  // tasks go to the core team only; deal owners include sourcing partners
+  assignees?: [string, string][];
   currentUser: CurrentUser;
   onClose: () => void;
   onChanged: (d: Deal) => void;
@@ -118,6 +121,8 @@ export default function DealDrawer({
   // resolve an owner/assignee code to a display name (falls back to the code)
   const ownerName = (code: string | null) =>
     code ? (owners.find(([c]) => c === code)?.[1] ?? code) : null;
+
+  const taskOwners = assignees ?? owners;
 
   const loadActions = useCallback(async () => {
     const { data } = await supabase
@@ -891,7 +896,7 @@ export default function DealDrawer({
                 title="Due date"
               />
               <PersonSelect
-                owners={owners}
+                owners={taskOwners}
                 value={taskAssignee}
                 onChange={setTaskAssignee}
                 placeholder="Assign to…"
@@ -937,7 +942,7 @@ export default function DealDrawer({
                           title="Due date"
                         />
                         <PersonSelect
-                          owners={owners}
+                          owners={taskOwners}
                           value={etAssignee}
                           onChange={setEtAssignee}
                           placeholder="Assign to…"

@@ -12,6 +12,7 @@ export default function PipelineBoard({
   stages,
   deals: initialDeals,
   owners,
+  assignees,
   currentUser,
   dealsWithTask = [],
   initialDealId = null,
@@ -19,6 +20,7 @@ export default function PipelineBoard({
   stages: Stage[];
   deals: Deal[];
   owners: [string, string][];
+  assignees: [string, string][];
   currentUser: CurrentUser;
   dealsWithTask?: string[];
   initialDealId?: string | null;
@@ -243,6 +245,7 @@ export default function PipelineBoard({
           deal={selectedDeal}
           stages={stages}
           owners={owners}
+          assignees={assignees}
           currentUser={currentUser}
           onClose={() => setSelectedId(null)}
           onChanged={(updated) =>
