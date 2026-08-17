@@ -16,7 +16,12 @@
 //   A) insert contacts referenced by deals but absent from the June export
 //      (created in HubSpot after June 8) — name/email parsed from the deals
 //      export's "Associated Contact" column
-//   B) backfill contacts.linkedin_url from the June export (fill-only)
+//   B) backfill contacts.linkedin_url from the contacts export (fill-only)
+//   B2/B3) backfill titles and names the same way — mostly no-ops against the
+//      June export (already imported), but re-running this script with a
+//      FRESH contacts export completes the post-June contacts, which today
+//      exist as name/email-only rows, and section D then carries their
+//      title/LinkedIn onto their deals
 //   C) link contacts to their deals via "Associated Contact IDs" (fill-only;
 //      a contact on several deals keeps the first deal, primary-position first)
 //   D) set each deal's primary-contact fields (name/title/email/linkedin) from
@@ -165,13 +170,19 @@ for (const d of deals) {
   });
 }
 
-// LinkedIn backfill list from the June export
+// LinkedIn / title / name backfill lists from the contacts export
 const linkedinRows = [];
+const titleRows = [];
+const nameRows = [];
 for (const c of contacts) {
   const url = linkedinOf(c);
   if (url) linkedinRows.push({ lid: c["Record ID"], url });
+  const title = (c["Job Title"] ?? "").trim();
+  if (title) titleRows.push({ lid: c["Record ID"], title });
+  const fullName = [c["First Name"], c["Last Name"]].filter(Boolean).join(" ").trim();
+  if (fullName) nameRows.push({ lid: c["Record ID"], name: fullName });
 }
-// missing contacts aren't in the June export, so no LinkedIn for them
+// contacts missing from the export get nothing here — re-run with a fresh one
 
 const multiDeal = [...dealCountOf.values()].filter((n) => n > 1).length;
 
@@ -194,11 +205,25 @@ if (missingContacts.size) {
 }
 
 // B) LinkedIn backfill (fill-only: manual edits in the app win)
-out += `-- B) LinkedIn URLs from the June export\nupdate public.contacts c\nset linkedin_url = v.url\nfrom (values\n`;
+out += `-- B) LinkedIn URLs from the contacts export\nupdate public.contacts c\nset linkedin_url = v.url\nfrom (values\n`;
 out += linkedinRows
   .map((r, i) => `  (${r.lid}${i === 0 ? "::bigint" : ""}, ${sq(r.url)})`)
   .join(",\n");
 out += `\n) as v(legacy_id, url)\nwhere c.legacy_id = v.legacy_id\n  and (c.linkedin_url is null or c.linkedin_url = '');\n\n`;
+
+// B2) titles, fill-only
+out += `-- B2) job titles from the contacts export\nupdate public.contacts c\nset title = v.title\nfrom (values\n`;
+out += titleRows
+  .map((r, i) => `  (${r.lid}${i === 0 ? "::bigint" : ""}, ${sq(r.title)})`)
+  .join(",\n");
+out += `\n) as v(legacy_id, title)\nwhere c.legacy_id = v.legacy_id\n  and (c.title is null or c.title = '');\n\n`;
+
+// B3) names, fill-only (covers contacts inserted email-only in section A)
+out += `-- B3) names from the contacts export\nupdate public.contacts c\nset name = v.name\nfrom (values\n`;
+out += nameRows
+  .map((r, i) => `  (${r.lid}${i === 0 ? "::bigint" : ""}, ${sq(r.name)})`)
+  .join(",\n");
+out += `\n) as v(legacy_id, name)\nwhere c.legacy_id = v.legacy_id\n  and (c.name is null or c.name = '');\n\n`;
 
 // C) contact -> deal links (fill-only; app-made links and later edits win)
 out += `-- C) attach contacts to their HubSpot-associated deal\nupdate public.contacts c\nset deal_id = d.id,\n    stage = d.stage\nfrom (values\n`;
@@ -267,8 +292,9 @@ export and the 2026-06-08 contacts export.
 
 - **${missingContacts.size} contacts inserted** that were created in HubSpot after the
   June contacts export (name/email recovered from the deals export).
-- **${linkedinRows.length} contacts** get their LinkedIn URL from the June export
-  (fill-only — URLs entered in the app are kept).
+- **${linkedinRows.length} contacts** get their LinkedIn URL from the contacts export,
+  **${titleRows.length}** their job title, **${nameRows.length}** their name (all
+  fill-only — values entered in the app are kept).
 - **${contactToDeal.size} contact→deal links** from HubSpot's real associations
   (fill-only). ${multiDeal} contacts are associated with more than one deal in
   HubSpot; the CRM links each to one deal (their primary association).
@@ -289,6 +315,7 @@ writeFileSync(new URL("../supabase/seed/hubspot-contact-fix-aug2026-report.md", 
 console.log("Wrote supabase/seed/hubspot-contact-fix-aug2026.sql");
 console.log(`  missing contacts inserted: ${missingContacts.size}`);
 console.log(`  linkedin backfill rows:    ${linkedinRows.length}`);
+console.log(`  title/name backfill rows:  ${titleRows.length}/${nameRows.length}`);
 console.log(`  contact→deal links:        ${contactToDeal.size} (${multiDeal} multi-deal contacts)`);
 console.log(`  deals w/ primary contact:  ${primaryOf.length}`);
 console.log(`  deals w/o any contact:     ${dealsWithoutContacts}`);

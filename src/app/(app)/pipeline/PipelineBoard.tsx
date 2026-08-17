@@ -173,7 +173,10 @@ export default function PipelineBoard({
                       onClick={() => setSelectedId(d.id)}
                       style={{ cursor: "pointer" }}
                     >
-                      <div className="kco">
+                      {/* card title is the deal name (defaults to "Company –
+                          Contact"); contact below beats client type for
+                          telling deals apart at a glance (Oleksandr, Aug 2026) */}
+                      <div className="kco" title={d.dealname ?? d.company ?? ""}>
                         {d.hot && (
                           <span
                             className="actiondot"
@@ -181,7 +184,7 @@ export default function PipelineBoard({
                             title="Hot"
                           />
                         )}
-                        {d.company}
+                        {d.dealname || d.company}
                         {noTask && (
                           <span className="notask-chip" title="No active task">
                             no task
@@ -190,7 +193,7 @@ export default function PipelineBoard({
                       </div>
                       <div className="kval">
                         {d.value > 0 ? gbp(d.value) + " · " : ""}
-                        {d.client_type || "Unassigned"}
+                        {d.contact_name || "No contact"}
                       </div>
                       <div className="kfoot">
                         <span className={`kage ${ac}`}>

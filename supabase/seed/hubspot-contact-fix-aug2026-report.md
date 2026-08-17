@@ -15,8 +15,9 @@ export and the 2026-06-08 contacts export.
 
 - **25 contacts inserted** that were created in HubSpot after the
   June contacts export (name/email recovered from the deals export).
-- **1939 contacts** get their LinkedIn URL from the June export
-  (fill-only — URLs entered in the app are kept).
+- **1939 contacts** get their LinkedIn URL from the contacts export,
+  **2136** their job title, **3521** their name (all
+  fill-only — values entered in the app are kept).
 - **566 contact→deal links** from HubSpot's real associations
   (fill-only). 86 contacts are associated with more than one deal in
   HubSpot; the CRM links each to one deal (their primary association).
