@@ -82,6 +82,16 @@ export default function PipelineBoard({
       );
       alert("Could not move deal: " + error.message);
     } else {
+      // record the move in the deal's activity feed (same as the drawer path)
+      const from = stages.find((s) => s.id === deal.stage)?.name ?? deal.stage;
+      const to = stages.find((s) => s.id === stage)?.name ?? stage;
+      await supabase.from("actions").insert({
+        deal_id: dealId,
+        owner_id: currentUser.id,
+        owner_code: currentUser.repCode,
+        kind: "stage",
+        note: `Moved ${from} → ${to}`,
+      });
       router.refresh();
     }
   }

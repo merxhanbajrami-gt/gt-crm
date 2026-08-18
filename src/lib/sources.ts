@@ -29,3 +29,17 @@ export type LeadSource = (typeof LEAD_SOURCES)[number];
 export const CLIENT_TYPES = ["New Client", "Existing Client"] as const;
 
 export type ClientType = (typeof CLIENT_TYPES)[number];
+
+// Why a deal was lost — asked for when marking a deal lost, grouped on the
+// scorecard. Derived from the HubSpot "Closed Lost" dispositions.
+export const LOST_REASONS = [
+  "Went dark",
+  "Budget / pricing",
+  "Chose competitor",
+  "Went in-house",
+  "Paused / timing",
+  "Not a fit",
+  "Other",
+] as const;
+
+export type LostReason = (typeof LOST_REASONS)[number];

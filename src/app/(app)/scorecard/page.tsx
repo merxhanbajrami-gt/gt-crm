@@ -15,6 +15,10 @@ interface SourceRow {
   source: string;
   count: number;
 }
+interface LostReasonRow {
+  reason: string;
+  count: number;
+}
 
 function Bar({
   label,
@@ -66,21 +70,29 @@ function Bar({
 
 export default async function ScorecardPage() {
   const supabase = await createClient();
-  const [{ data: summary }, { data: byStage }, { data: byClientType }, { data: bySource }] =
-    await Promise.all([
-      supabase.rpc("scorecard_summary"),
-      supabase.from("v_pipeline_by_stage").select("*"),
-      supabase.from("v_pipeline_by_client_type").select("*").limit(8),
-      supabase.from("v_deals_by_source").select("*").limit(8),
-    ]);
+  const [
+    { data: summary },
+    { data: byStage },
+    { data: byClientType },
+    { data: bySource },
+    { data: byLostReason },
+  ] = await Promise.all([
+    supabase.rpc("scorecard_summary"),
+    supabase.from("v_pipeline_by_stage").select("*"),
+    supabase.from("v_pipeline_by_client_type").select("*").limit(8),
+    supabase.from("v_deals_by_source").select("*").limit(8),
+    supabase.from("v_lost_by_reason").select("*").limit(8),
+  ]);
 
   const s = (summary ?? {}) as Record<string, number>;
   const stages = (byStage ?? []) as StageRow[];
   const clientTypes = (byClientType ?? []) as ClientTypeRow[];
   const sources = (bySource ?? []) as SourceRow[];
+  const lostReasons = (byLostReason ?? []) as LostReasonRow[];
   const maxStage = Math.max(1, ...stages.map((r) => r.count));
   const maxType = Math.max(1, ...clientTypes.map((r) => r.count));
   const maxSource = Math.max(1, ...sources.map((r) => r.count));
+  const maxLost = Math.max(1, ...lostReasons.map((r) => r.count));
 
   const bignums = [
     { k: "Contacts on record", v: s.total_contacts ?? 0, sub: "unique people in the book" },
@@ -153,6 +165,22 @@ export default async function ScorecardPage() {
                 value={r.count}
                 max={maxSource}
                 color="#7B7AE6"
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="chartcard">
+          <h3>Lost deals by reason</h3>
+          <div className="chsub">Where deals die — captured at mark-lost</div>
+          <div style={{ marginTop: 14 }}>
+            {lostReasons.map((r) => (
+              <Bar
+                key={r.reason}
+                label={r.reason}
+                value={r.count}
+                max={maxLost}
+                color="var(--red, #DC2626)"
               />
             ))}
           </div>

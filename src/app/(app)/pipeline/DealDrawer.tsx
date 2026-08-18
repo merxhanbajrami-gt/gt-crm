@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { fmtAge, quietDays } from "@/lib/format";
 import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
-import { CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
+import { CLIENT_TYPES, LEAD_SOURCES, LOST_REASONS } from "@/lib/sources";
 import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
@@ -87,6 +87,10 @@ export default function DealDrawer({
   // inline note editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  // mark-lost dialog
+  const [lostModal, setLostModal] = useState(false);
+  const [lostReason, setLostReason] = useState("");
+  const [lostDetail, setLostDetail] = useState("");
   // task editing
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [etObjective, setEtObjective] = useState("");
@@ -224,24 +228,40 @@ export default function DealDrawer({
     return true;
   }
 
-  async function moveStage(stage: string) {
+  async function moveStage(
+    stage: string,
+    lost?: { reason: string; detail: string },
+  ) {
     if (stage === d.stage) return;
     const from = stages.find((x) => x.id === d.stage)?.name ?? d.stage;
     const to = stages.find((x) => x.id === stage)?.name ?? stage;
-    const ok = await patchDeal({
+    // the DB trigger owns close_date/lost_reason on stage changes (0016) —
+    // mirror its rules in the patch so the drawer shows them without a refetch
+    const closing = stage === "won" || stage === "lost";
+    const reopening = !closing && (d.stage === "won" || d.stage === "lost");
+    const patch: Partial<Deal> = {
       stage: stage as Deal["stage"],
       last_touched_at: new Date().toISOString(),
-    });
+    };
+    if (closing)
+      patch.close_date = d.close_date ?? new Date().toISOString().slice(0, 10);
+    if (reopening || stage === "won") patch.lost_reason = null;
+    if (reopening) patch.close_date = null;
+    if (lost) patch.lost_reason = lost.reason;
+    const ok = await patchDeal(patch);
     if (!ok) return;
     // keep linked contacts' stage in step (the Contacts page filters on it)
     await supabase.from("contacts").update({ stage }).eq("deal_id", d.id);
-    // record the move in the activity feed (who + what)
+    // record the move in the activity feed (who + what + why, for lost)
+    const detail = lost?.detail.trim();
     await supabase.from("actions").insert({
       deal_id: d.id,
       owner_id: currentUser.id,
       owner_code: currentUser.repCode,
       kind: "stage",
-      note: `Moved ${from} → ${to}`,
+      note:
+        `Moved ${from} → ${to}` +
+        (lost ? ` · ${lost.reason}${detail ? `: ${detail}` : ""}` : ""),
     });
     loadActions();
   }
@@ -530,7 +550,11 @@ export default function DealDrawer({
                 className="sm-pill"
                 style={{ ["--smc" as string]: "var(--red)" }}
                 disabled={busy}
-                onClick={() => moveStage("lost")}
+                onClick={() => {
+                  setLostReason("");
+                  setLostDetail("");
+                  setLostModal(true);
+                }}
               >
                 Mark lost
               </button>
@@ -658,6 +682,30 @@ export default function DealDrawer({
                 ))}
               </select>
             </div>
+            {d.stage === "lost" && (
+              <div className="dfield">
+                <div className="fl">Why lost</div>
+                <select
+                  className="dedit"
+                  value={d.lost_reason ?? ""}
+                  disabled={busy}
+                  onChange={(e) =>
+                    patchDeal({ lost_reason: e.target.value || null })
+                  }
+                >
+                  <option value="">Unspecified</option>
+                  {LOST_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                  {d.lost_reason &&
+                    !(LOST_REASONS as readonly string[]).includes(
+                      d.lost_reason,
+                    ) && <option value={d.lost_reason}>{d.lost_reason}</option>}
+                </select>
+              </div>
+            )}
             <div className="dfield">
               <div className="fl">Email</div>
               <input
@@ -1146,6 +1194,80 @@ export default function DealDrawer({
           </div>
         </div>
       </aside>
+
+      {/* mark-lost dialog — the reason feeds the scorecard's lost breakdown */}
+      {lostModal && (
+        <>
+          <div
+            className="scrim open"
+            style={{ zIndex: 96 }}
+            onClick={() => setLostModal(false)}
+          />
+          <div
+            role="dialog"
+            aria-label="Mark lost"
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: 380,
+              maxWidth: "92vw",
+              background: "#fff",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              boxShadow: "0 24px 60px rgba(10,10,40,.18)",
+              zIndex: 97,
+              padding: 20,
+            }}
+          >
+            <div className="eyebrow">Close the deal</div>
+            <h2 style={{ marginBottom: 4 }}>Why did we lose it?</h2>
+            <p className="cm" style={{ margin: "0 0 12px" }}>
+              Feeds the scorecard, so we learn where deals die.
+            </p>
+            <select
+              className="dedit"
+              value={lostReason}
+              autoFocus
+              onChange={(e) => setLostReason(e.target.value)}
+            >
+              <option value="">Pick a reason…</option>
+              {LOST_REASONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="ctx-add"
+              style={{ marginTop: 8 }}
+              value={lostDetail}
+              onChange={(e) => setLostDetail(e.target.value)}
+              placeholder="Optional detail: what happened?"
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button
+                className="lf-submit"
+                style={{ flex: 1 }}
+                disabled={busy || !lostReason}
+                onClick={async () => {
+                  await moveStage("lost", {
+                    reason: lostReason,
+                    detail: lostDetail,
+                  });
+                  setLostModal(false);
+                }}
+              >
+                Mark lost
+              </button>
+              <button className="ctx-del" onClick={() => setLostModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

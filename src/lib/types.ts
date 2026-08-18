@@ -38,6 +38,7 @@ export interface Deal {
   company_id: string | null;
   first_touch_date: string | null;
   close_date: string | null;
+  lost_reason: string | null;
   hot: boolean;
   last_activity: string | null;
   n_contacts: number;
