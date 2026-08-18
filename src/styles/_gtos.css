@@ -260,3 +260,11 @@ td a:hover{text-decoration:underline;}
 .topbar .gt-logo{width:34px;height:20px;}
 .login .gt-logo{width:44px;height:26px;}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important;}}
+
+/* hand-written note formatting (NoteText): paragraphs, "- " bullets, **bold** */
+.note-rich p{margin:0 0 7px;}
+.note-rich ul{margin:0 0 7px;padding-left:16px;}
+.note-rich li{margin:2px 0;}
+.note-rich p:last-child,.note-rich ul:last-child{margin-bottom:0;}
+.note-rich strong{font-weight:800;}
+.note-hint{font-size:10.5px;color:var(--text-faint);margin:4px 0 6px;}

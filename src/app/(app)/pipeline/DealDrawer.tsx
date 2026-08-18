@@ -9,6 +9,7 @@ import { CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
 import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
+import NoteText from "@/components/NoteText";
 import type { ActionItem, Contact, Deal, Stage } from "@/lib/types";
 
 const DAY = 86400000;
@@ -1037,6 +1038,10 @@ export default function DealDrawer({
             onChange={(e) => setNote(e.target.value)}
             placeholder="Add context: a call summary, a blocker, a next step, who introduced you…"
           />
+          <div className="note-hint">
+            Line breaks are kept · start a line with “- ” for a bullet ·
+            **bold**
+          </div>
           <button
             className="ctx-addbtn"
             disabled={busy || !note.trim()}
@@ -1091,7 +1096,7 @@ export default function DealDrawer({
                     ) : (
                       <>
                         <div className="tt">
-                          {a.note ? a.note : `Logged ${a.kind}`}
+                          {a.note ? <NoteText text={a.note} /> : `Logged ${a.kind}`}
                         </div>
                         <div className="tw">{fmtWhen(a.created_at)}</div>
                       </>

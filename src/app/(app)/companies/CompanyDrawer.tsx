@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { gbp } from "@/lib/format";
 import LinkedInIcon from "@/components/LinkedInIcon";
+import NoteText from "@/components/NoteText";
 import type { ActionItem, Company, Contact, Deal, Stage } from "@/lib/types";
 import type { CurrentUser } from "../pipeline/DealDrawer";
 
@@ -335,6 +336,10 @@ export default function CompanyDrawer({
             onChange={(e) => setNote(e.target.value)}
             placeholder="Add a company-level note: relationship history, org changes, who knows whom…"
           />
+          <div className="note-hint">
+            Line breaks are kept · start a line with “- ” for a bullet ·
+            **bold**
+          </div>
           <button
             className="ctx-addbtn"
             disabled={busy || !note.trim()}
@@ -352,8 +357,8 @@ export default function CompanyDrawer({
               <div key={a.id} className="tl-item">
                 <div className="tl-dot" />
                 <div className="tl-body">
-                  <div className="tt" style={{ whiteSpace: "pre-wrap" }}>
-                    {a.note}
+                  <div className="tt">
+                    {a.note ? <NoteText text={a.note} /> : null}
                   </div>
                   <div className="tw">
                     {fmtWhen(a.created_at)}
