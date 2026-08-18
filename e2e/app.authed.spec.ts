@@ -11,6 +11,7 @@ test.describe.configure({ mode: "serial" });
 test.afterAll(async () => {
   const admin = adminClient();
   await admin.from("deals").delete().like("company", `${TEST_DEAL_PREFIX}%`);
+  await admin.from("contacts").delete().like("name", `${TEST_DEAL_PREFIX}%`);
   // the Add-deal company type-ahead also creates a company-book entry
   await admin.from("companies").delete().like("name", `${TEST_DEAL_PREFIX}%`);
 });
@@ -47,6 +48,39 @@ test.describe("Pipeline", () => {
     // active flow columns render (Lost lives under its own tab, not here)
     await expect(page.getByText("Connection")).toBeVisible();
     await expect(page.getByText("Won")).toBeVisible();
+  });
+});
+
+test.describe("Contacts", () => {
+  // RLS: a rep only sees contacts they own, so seed one for the E2E rep
+  const contactName = `${TEST_DEAL_PREFIX} Contact Person`;
+
+  test.beforeAll(async () => {
+    const admin = adminClient();
+    await admin.from("contacts").insert({
+      name: contactName,
+      email: "autotest-contact@gt-hq.com",
+      title: "QA Champion",
+      stage: "connection",
+      owner_code: "E2E",
+    });
+  });
+
+  test("book search opens the contact record with its sections", async ({
+    page,
+  }) => {
+    await page.goto("/contacts");
+    await expect(page.getByRole("heading", { name: "Contacts" })).toBeVisible();
+
+    await page.getByPlaceholder(/search contacts/i).fill(contactName);
+    const cell = page.getByRole("cell", { name: contactName }).first();
+    await expect(cell).toBeVisible();
+
+    // row opens the editable contact record
+    await cell.click();
+    await expect(page.getByText("Contact record")).toBeVisible();
+    await expect(page.getByText(/^Deal$/)).toBeVisible();
+    await expect(page.getByText(/^Notes \(/)).toBeVisible();
   });
 });
 

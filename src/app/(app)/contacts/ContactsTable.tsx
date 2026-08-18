@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import LinkedInIcon from "@/components/LinkedInIcon";
-import type { Contact } from "@/lib/types";
-
-export const CONTACTS_PAGE = 200;
+import ContactDrawer from "./ContactDrawer";
+import { CONTACTS_PAGE, CONTACT_COLS, type ContactRow } from "./shared";
+import type { CurrentUser } from "../pipeline/DealDrawer";
 
 type SortKey = "name" | "dealname" | "stage" | "owner_code";
 type Filter = "all" | "active" | "won" | "lost";
@@ -23,18 +23,23 @@ const SEARCH_COLS = ["name", "dealname", "title", "email", "owner_code"];
 export default function ContactsTable({
   initialContacts,
   total,
+  currentUser,
+  initialContact = null,
 }: {
-  initialContacts: Contact[];
+  initialContacts: ContactRow[];
   total: number;
+  currentUser: CurrentUser;
+  initialContact?: ContactRow | null;
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [asc, setAsc] = useState(true);
 
-  const [rows, setRows] = useState<Contact[]>(initialContacts);
+  const [rows, setRows] = useState<ContactRow[]>(initialContacts);
   const [matches, setMatches] = useState(total);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<ContactRow | null>(initialContact);
   const didMount = useRef(false);
 
   // Query the whole table server-side whenever the search/filter/sort changes.
@@ -50,7 +55,7 @@ export default function ContactsTable({
       const supabase = createClient();
       let query = supabase
         .from("contacts")
-        .select("*", { count: "exact" })
+        .select(CONTACT_COLS, { count: "exact" })
         .order(sortKey, { ascending: asc })
         .limit(CONTACTS_PAGE);
 
@@ -66,7 +71,7 @@ export default function ContactsTable({
       }
 
       const { data, count } = await query;
-      setRows((data ?? []) as Contact[]);
+      setRows((data ?? []) as unknown as ContactRow[]);
       setMatches(count ?? 0);
       setLoading(false);
     }, 250);
@@ -110,7 +115,7 @@ export default function ContactsTable({
             <tr>
               <th onClick={() => sortBy("name")}>Name{arrow("name")}</th>
               <th onClick={() => sortBy("dealname")}>
-                Company / Deal{arrow("dealname")}
+                Company{arrow("dealname")}
               </th>
               <th onClick={() => sortBy("stage")}>Stage{arrow("stage")}</th>
               <th>Email</th>
@@ -121,7 +126,11 @@ export default function ContactsTable({
           </thead>
           <tbody>
             {rows.map((c) => (
-              <tr key={c.id}>
+              <tr
+                key={c.id}
+                onClick={() => setSelected(c)}
+                style={{ cursor: "pointer" }}
+              >
                 <td>
                   {c.name}
                   {c.linkedin_url && <LinkedInIcon url={c.linkedin_url} />}
@@ -132,7 +141,7 @@ export default function ContactsTable({
                     </span>
                   ) : null}
                 </td>
-                <td>{c.dealname || "—"}</td>
+                <td>{c.companies?.name || c.dealname || "—"}</td>
                 <td>{c.stage || "—"}</td>
                 <td>{c.email || "—"}</td>
                 <td>{c.owner_code || "—"}</td>
@@ -148,6 +157,24 @@ export default function ContactsTable({
               : `${matches.toLocaleString()} ${matches === 1 ? "match" : "matches"}.`}
         </p>
       </div>
+
+      {selected && (
+        <ContactDrawer
+          key={selected.id}
+          contact={selected}
+          currentUser={currentUser}
+          onClose={() => setSelected(null)}
+          onChanged={(u) =>
+            setRows((rs) =>
+              rs.map((r) => (r.id === u.id ? { ...r, ...u } : r)),
+            )
+          }
+          onDeleted={(id) => {
+            setRows((rs) => rs.filter((r) => r.id !== id));
+            setSelected(null);
+          }}
+        />
+      )}
     </>
   );
 }

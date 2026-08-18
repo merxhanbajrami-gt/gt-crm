@@ -314,7 +314,12 @@ export default function CompanyDrawer({
               </div>
             )}
             {contacts.map((p) => (
-              <div key={p.id} className="tl-item">
+              <Link
+                key={p.id}
+                href={`/contacts?contact=${p.id}`}
+                className="tl-item"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
                 <div className="tl-body">
                   <div className="tt">
                     {p.name || p.email || "Unnamed contact"}
@@ -324,7 +329,7 @@ export default function CompanyDrawer({
                     {[p.title, p.email].filter(Boolean).join(" · ") || "—"}
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
 
