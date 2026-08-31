@@ -37,6 +37,39 @@ test.describe("My Week", () => {
     await dialog.getByRole("button", { name: /close/i }).click();
     await expect(dialog).not.toBeVisible();
   });
+
+  test.describe("task deal drawer", () => {
+    // clicking a task's deal opens the drawer in place (Oleksandr, Aug 2026)
+    const company = `${TEST_DEAL_PREFIX} Drawer Co`;
+
+    test.beforeAll(async () => {
+      const admin = adminClient();
+      const { data: deal, error } = await admin
+        .from("deals")
+        .insert({ company, stage: "connection", owner_code: "E2E" })
+        .select("id")
+        .single();
+      if (error) throw error;
+      await admin.from("actions").insert({
+        deal_id: deal.id,
+        kind: "task",
+        done: false,
+        note: `${TEST_DEAL_PREFIX} follow up`,
+        owner_code: "E2E",
+        due_date: new Date().toISOString().slice(0, 10),
+      });
+      // the deal (and its task, via cascade) is wiped by the global afterAll
+    });
+
+    test("opens in place without leaving My Week", async ({ page }) => {
+      await page.goto("/");
+      await page.getByRole("link", { name: company }).click();
+      await expect(page.getByText("Deal record")).toBeVisible();
+      await expect(page.getByRole("heading", { name: company })).toBeVisible();
+      // no redirect to the pipeline
+      expect(new URL(page.url()).pathname).toBe("/");
+    });
+  });
 });
 
 test.describe("Pipeline", () => {

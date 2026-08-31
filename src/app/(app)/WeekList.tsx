@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { gbp } from "@/lib/format";
+import type { Deal, Stage } from "@/lib/types";
+import DealDrawer, { type CurrentUser } from "./pipeline/DealDrawer";
 
 export interface TaskRow {
   id: string;
@@ -43,13 +46,36 @@ function dueLabel(due: string | null): { text: string; cls: string } {
 export default function WeekList({
   rows: initialRows,
   title,
+  deals: initialDeals,
+  stages,
+  owners,
+  assignees,
+  currentUser,
 }: {
   rows: TaskRow[];
   title: string;
+  deals: Deal[];
+  stages: Stage[];
+  owners: [string, string][];
+  assignees: [string, string][];
+  currentUser: CurrentUser;
 }) {
+  const router = useRouter();
   const [rows, setRows] = useState<TaskRow[]>(initialRows);
+  const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [view, setView] = useState<View>("week");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedDeal = deals.find((d) => d.id === selectedId) ?? null;
+
+  // pick up fresh server data after router.refresh() (drawer close):
+  // reset local state when the server hands down new props
+  const [prevInitialRows, setPrevInitialRows] = useState(initialRows);
+  if (prevInitialRows !== initialRows) {
+    setPrevInitialRows(initialRows);
+    setRows(initialRows);
+    setDeals(initialDeals);
+  }
 
   // Show all overdue + tasks due within the window (7d / 30d) + tasks with no
   // due date. Tasks due beyond the window are hidden until it widens to Month.
@@ -167,12 +193,19 @@ export default function WeekList({
                   </div>
                   <div className="statsub">
                     {r.dealId ? (
-                      <Link
+                      // plain click opens the deal drawer here; cmd/ctrl-click
+                      // still lands on the pipeline via the real href
+                      <a
                         href={`/pipeline?deal=${r.dealId}`}
                         style={{ color: "inherit" }}
+                        onClick={(e) => {
+                          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                          e.preventDefault();
+                          setSelectedId(r.dealId);
+                        }}
                       >
                         {r.company || r.dealname || "—"}
-                      </Link>
+                      </a>
                     ) : (
                       r.company || r.dealname || "—"
                     )}
@@ -209,6 +242,46 @@ export default function WeekList({
             </Link>
           </div>
         </div>
+      )}
+
+      {selectedDeal && (
+        <DealDrawer
+          key={selectedDeal.id}
+          deal={selectedDeal}
+          stages={stages}
+          owners={owners}
+          assignees={assignees}
+          currentUser={currentUser}
+          onClose={() => {
+            setSelectedId(null);
+            // tasks may have changed inside the drawer — refetch the list
+            router.refresh();
+          }}
+          onChanged={(updated) => {
+            setDeals((ds) =>
+              ds.map((x) => (x.id === updated.id ? updated : x)),
+            );
+            // keep the task rows' deal context in step
+            setRows((rs) =>
+              rs.map((r) =>
+                r.dealId === updated.id
+                  ? {
+                      ...r,
+                      company: updated.company,
+                      dealname: updated.dealname,
+                      value: updated.value,
+                      hot: updated.hot,
+                    }
+                  : r,
+              ),
+            );
+          }}
+          onDeleted={(id) => {
+            setSelectedId(null);
+            setDeals((ds) => ds.filter((x) => x.id !== id));
+            setRows((rs) => rs.filter((r) => r.dealId !== id));
+          }}
+        />
       )}
     </div>
   );
