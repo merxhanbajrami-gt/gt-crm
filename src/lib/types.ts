@@ -36,7 +36,7 @@ export interface Deal {
   client_type: string | null;
   source: string | null;
   company_id: string | null;
-  first_touch_date: string | null;
+  first_touch_date: string; // mandatory since 0017 (defaults to the creation day)
   close_date: string | null;
   lost_reason: string | null;
   hot: boolean;
@@ -72,15 +72,23 @@ export interface Company {
   city: string | null;
   country: string | null;
   industry: string | null;
+  // manual override of the derived client status; null = derive from deals
+  client_type: string | null;
   last_activity: string | null;
   created_at: string;
   updated_at: string;
 }
 
-// a v_companies row: company + its deal/contact counts
+// a v_companies row: company + its deal/contact counts + client status
 export interface CompanyRow extends Company {
   deal_count: number;
   contact_count: number;
+  won_count: number;
+  // first won deal's close date — when they became a client
+  client_since: string | null;
+  // override ?? derived: Existing Client (won, or sold to pre-CRM) /
+  // New Client (a prospect with deals) / null (no deals)
+  client_status: string | null;
 }
 
 export interface ActionItem {

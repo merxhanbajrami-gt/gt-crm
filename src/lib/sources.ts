@@ -24,9 +24,10 @@ export const LEAD_SOURCES = [
 
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
-// Closed list for deals.client_type (was HubSpot "Deal Type"). Two values on
-// purpose — Oleksandr's ask was exactly New vs Existing client.
-export const CLIENT_TYPES = ["New Client", "Existing Client"] as const;
+// Closed list for deals.client_type (was HubSpot "Deal Type") and for the
+// company-level client status. Ex-Client added Sep 2026 (Oleksandr). Winning
+// a deal flips New Client / Ex-Client → Existing Client (DB trigger, 0017).
+export const CLIENT_TYPES = ["New Client", "Existing Client", "Ex-Client"] as const;
 
 export type ClientType = (typeof CLIENT_TYPES)[number];
 

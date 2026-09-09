@@ -22,6 +22,8 @@ export interface TaskRow {
 }
 
 type View = "week" | "month";
+// whose tasks: mine / one teammate's / everyone's (Oleksandr, Sep 2026)
+type Who = "mine" | "teammate" | "all";
 const DAY = 86400000;
 
 function todayStr() {
@@ -45,26 +47,41 @@ function dueLabel(due: string | null): { text: string; cls: string } {
 
 export default function WeekList({
   rows: initialRows,
-  title,
   deals: initialDeals,
   stages,
   owners,
   assignees,
   currentUser,
+  canFilterPeople,
 }: {
   rows: TaskRow[];
-  title: string;
   deals: Deal[];
   stages: Stage[];
   owners: [string, string][];
   assignees: [string, string][];
   currentUser: CurrentUser;
+  // managers see the whole team's tasks, so they get the person filter;
+  // reps only ever see their own (RLS), so it would be noise for them
+  canFilterPeople: boolean;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<TaskRow[]>(initialRows);
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [view, setView] = useState<View>("week");
+  const teammates = assignees.filter(([code]) => code !== currentUser.repCode);
+  const [who, setWho] = useState<Who>(
+    canFilterPeople && currentUser.repCode ? "mine" : "all",
+  );
+  const [teammate, setTeammate] = useState<string>(teammates[0]?.[0] ?? "");
+  const teammateName =
+    teammates.find(([code]) => code === teammate)?.[1] ?? teammate;
+  const title =
+    !canFilterPeople || who === "mine"
+      ? "Your tasks"
+      : who === "teammate"
+        ? `${teammateName}'s tasks`
+        : "Team tasks";
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedDeal = deals.find((d) => d.id === selectedId) ?? null;
 
@@ -81,7 +98,14 @@ export default function WeekList({
   // due date. Tasks due beyond the window are hidden until it widens to Month.
   const visible = useMemo(() => {
     const horizon = view === "week" ? 7 : 30;
+    const byPerson = (r: TaskRow) =>
+      !canFilterPeople || who === "all"
+        ? true
+        : who === "mine"
+          ? r.owner_code === currentUser.repCode
+          : r.owner_code === teammate;
     return rows
+      .filter(byPerson)
       .filter((r) => {
         const d = daysUntil(r.due_date);
         return d === null || d <= horizon;
@@ -93,7 +117,7 @@ export default function WeekList({
         if (db === null) return -1;
         return da - db; // most overdue first
       });
-  }, [rows, view]);
+  }, [rows, view, who, teammate, canFilterPeople, currentUser.repCode]);
 
   const overdue = visible.filter((r) => {
     const d = daysUntil(r.due_date);
@@ -133,7 +157,46 @@ export default function WeekList({
     <div className="panel">
       <div className="panel-head">
         <h2>{title}</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
+        >
+          {canFilterPeople && (
+            <div className="toolbar" style={{ margin: 0 }} aria-label="Whose tasks">
+              <button
+                className={`filterbtn${who === "mine" ? " on" : ""}`}
+                onClick={() => setWho("mine")}
+              >
+                My tasks
+              </button>
+              <button
+                className={`filterbtn${who === "teammate" ? " on" : ""}`}
+                onClick={() => setWho("teammate")}
+              >
+                Teammate&apos;s tasks
+              </button>
+              {who === "teammate" && (
+                <select
+                  className="dedit"
+                  aria-label="Teammate"
+                  value={teammate}
+                  onChange={(e) => setTeammate(e.target.value)}
+                  style={{ padding: "8px 10px", fontSize: 12.5 }}
+                >
+                  {teammates.map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                className={`filterbtn${who === "all" ? " on" : ""}`}
+                onClick={() => setWho("all")}
+              >
+                All tasks
+              </button>
+            </div>
+          )}
           <div className="toolbar" style={{ margin: 0 }}>
             <button
               className={`filterbtn${view === "week" ? " on" : ""}`}
@@ -163,8 +226,13 @@ export default function WeekList({
           <div className="ring">✓</div>
           <div className="big">All clear.</div>
           <div className="sub">
-            No tasks due {view === "week" ? "this week" : "this month"}. Open a
-            deal to add one.
+            No tasks due {view === "week" ? "this week" : "this month"}
+            {canFilterPeople && who === "mine"
+              ? " assigned to you"
+              : canFilterPeople && who === "teammate"
+                ? ` assigned to ${teammateName}`
+                : ""}
+            . Open a deal to add one.
           </div>
         </div>
       ) : (

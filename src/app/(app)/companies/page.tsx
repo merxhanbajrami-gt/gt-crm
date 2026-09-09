@@ -39,9 +39,11 @@ export default async function CompaniesPage({
       <div className="eyebrow">Account book</div>
       <h1 className="view-title">Companies</h1>
       <p className="view-sub">
-        {total.toLocaleString()} companies from HubSpot and the pipeline. Open
-        one to see every deal and contact tied to it over time. Search queries
-        the whole book, not just this page.
+        {total.toLocaleString()} companies from HubSpot and the pipeline. Client
+        type and &ldquo;client since&rdquo; come from won deals: a company is a
+        client from its first won deal&apos;s close date. Open one to see every
+        deal and contact tied to it over time. Search and filters query the
+        whole book, not just this page.
       </p>
       <CompaniesTable
         initialCompanies={(data ?? []) as CompanyRow[]}

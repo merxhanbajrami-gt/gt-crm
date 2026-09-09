@@ -4,9 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { gbp } from "@/lib/format";
+import { CLIENT_TYPES } from "@/lib/sources";
 import LinkedInIcon from "@/components/LinkedInIcon";
 import NoteText from "@/components/NoteText";
-import type { ActionItem, Company, Contact, Deal, Stage } from "@/lib/types";
+import ClientTag, { fmtDay } from "@/components/ClientTag";
+import type {
+  ActionItem,
+  Company,
+  CompanyRow,
+  Contact,
+  Deal,
+  Stage,
+} from "@/lib/types";
 import type { CurrentUser } from "../pipeline/DealDrawer";
 
 function fmtWhen(iso: string) {
@@ -27,15 +36,15 @@ export default function CompanyDrawer({
   onChanged,
   onDeleted,
 }: {
-  company: Company;
+  company: CompanyRow;
   stages: Stage[];
   currentUser: CurrentUser;
   onClose: () => void;
-  onChanged: (c: Company) => void;
+  onChanged: (c: CompanyRow) => void;
   onDeleted: (id: string) => void;
 }) {
   const supabase = createClient();
-  const [c, setC] = useState<Company>(company);
+  const [c, setC] = useState<CompanyRow>(company);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [notes, setNotes] = useState<ActionItem[]>([]);
@@ -91,13 +100,25 @@ export default function CompanyDrawer({
       .from("companies")
       .update(patch)
       .eq("id", c.id);
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setC(prev);
       alert("Could not save: " + error.message);
       return false;
     }
-    onChanged(next);
+    // the client status is derived in the view — re-read it after an override change
+    let saved: CompanyRow = next;
+    if ("client_type" in patch) {
+      const { data } = await supabase
+        .from("v_companies")
+        .select("*")
+        .eq("id", c.id)
+        .maybeSingle();
+      if (data) saved = data as CompanyRow;
+      setC(saved);
+    }
+    setBusy(false);
+    onChanged(saved);
     return true;
   }
 
@@ -179,9 +200,23 @@ export default function CompanyDrawer({
           </button>
           <div className="eyebrow">Company record</div>
           <h2>{c.name}</h2>
-          <div className="dsub">
-            {[c.industry, c.city, c.country].filter(Boolean).join(" · ") ||
-              "No firmographics yet"}
+          <div
+            className="dsub"
+            style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+          >
+            <ClientTag status={c.client_status} />
+            <span>
+              {c.client_since
+                ? `client since ${fmtDay(c.client_since)}`
+                : c.client_status === "Existing Client"
+                  ? "client — no dated won deal yet"
+                  : c.client_status === "New Client"
+                    ? "prospect — no won deal yet"
+                    : "no deals on record"}
+              {[c.industry, c.city, c.country].filter(Boolean).length > 0
+                ? ` · ${[c.industry, c.city, c.country].filter(Boolean).join(" · ")}`
+                : ""}
+            </span>
           </div>
 
           {/* details — editable, so data cleanup can happen in place */}
@@ -254,6 +289,41 @@ export default function CompanyDrawer({
               <div className="fl">Owner</div>
               <div className="fv" style={{ fontSize: 12 }}>
                 {c.owner_name || c.owner_code || "—"}
+              </div>
+            </div>
+            <div className="dfield">
+              <div className="fl">Client type</div>
+              <select
+                className="dedit"
+                value={c.client_type ?? ""}
+                disabled={busy}
+                onChange={(e) =>
+                  patchCompany({ client_type: e.target.value || null })
+                }
+                aria-label="Client type"
+              >
+                <option value="">Automatic (from deals)</option>
+                {CLIENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              {c.client_type && (
+                <div style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 4 }}>
+                  Set by hand · a won deal resets it to Existing Client
+                </div>
+              )}
+            </div>
+            <div className="dfield">
+              <div className="fl">Client since</div>
+              <div className="fv" style={{ fontSize: 12 }}>
+                {fmtDay(c.client_since)}
+              </div>
+              <div style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 4 }}>
+                {c.won_count > 0
+                  ? `first of ${c.won_count} won ${c.won_count === 1 ? "deal" : "deals"}`
+                  : "date of the first won deal"}
               </div>
             </div>
           </div>

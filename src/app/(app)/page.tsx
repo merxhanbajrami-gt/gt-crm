@@ -106,7 +106,6 @@ export default async function MyWeekPage() {
       </div>
 
       <WeekList
-        title={isManager ? "Team tasks" : "Your tasks"}
         rows={rows}
         deals={deals}
         stages={stages}
@@ -117,6 +116,7 @@ export default async function MyWeekPage() {
           fullName: user!.fullName,
           repCode: user!.repCode,
         }}
+        canFilterPeople={isManager}
       />
     </section>
   );

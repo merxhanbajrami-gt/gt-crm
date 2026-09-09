@@ -33,6 +33,11 @@ test.describe("My Week", () => {
     await expect(dialog.getByText("Company *")).toBeVisible();
     await expect(dialog.getByText("Stage")).toBeVisible();
     await expect(dialog.getByText("Value (£k)")).toBeVisible();
+    // first touch is mandatory and defaults to today (Oleksandr, Sep 2026)
+    await expect(dialog.getByText("First touch *")).toBeVisible();
+    await expect(dialog.getByLabel("First touch")).toHaveValue(
+      new Date().toISOString().slice(0, 10),
+    );
     // close without creating anything
     await dialog.getByRole("button", { name: /close/i }).click();
     await expect(dialog).not.toBeVisible();
@@ -117,7 +122,57 @@ test.describe("Contacts", () => {
   });
 });
 
+test.describe("Lost", () => {
+  test("table sorts by closed date", async ({ page }) => {
+    await page.goto("/lost");
+    await expect(
+      page.getByRole("heading", { name: /deals we lost/i }),
+    ).toBeVisible();
+    // newest-closed first by default; clicking flips the direction
+    const closed = page.getByRole("columnheader", { name: /closed/i });
+    await expect(closed).toContainText("▼");
+    await closed.click();
+    await expect(closed).toContainText("▲");
+  });
+});
+
+test.describe("Scorecard", () => {
+  test("date range presets drive the dated numbers", async ({ page }) => {
+    await page.goto("/scorecard");
+    await expect(page.getByRole("heading", { name: "Scorecard" })).toBeVisible();
+    // the dated tiles (the funnel repeats "Leads added" as a bar label)
+    const tiles = page.locator(".stat .label");
+    await expect(tiles.filter({ hasText: "Leads added" })).toBeVisible();
+    await expect(tiles.filter({ hasText: "New clients" })).toBeVisible();
+    await page.getByRole("button", { name: "This quarter" }).click();
+    await expect(page).toHaveURL(/range=quarter/);
+    await expect(page.getByRole("button", { name: "This quarter" })).toHaveClass(
+      /on/,
+    );
+    // custom range shows the two date pickers
+    await page.getByRole("button", { name: "Custom" }).click();
+    await expect(page.getByLabel("From", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("To", { exact: true })).toBeVisible();
+  });
+});
+
 test.describe("Companies", () => {
+  test("client status columns and filter", async ({ page }) => {
+    await page.goto("/companies");
+    await expect(
+      page.getByRole("columnheader", { name: /client type/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: /client since/i }),
+    ).toBeVisible();
+    // filter to clients only: every visible tag reads Existing Client
+    await page.getByRole("button", { name: "Existing Client", exact: true }).click();
+    await expect(page.getByText(/matches\.$/)).toBeVisible();
+    const tags = page.locator("tbody td:nth-child(2)");
+    await expect(tags.first()).toHaveText("Existing Client");
+    await expect(tags.filter({ hasNotText: "Existing Client" })).toHaveCount(0);
+  });
+
   test("book lists imported companies and opens the company record", async ({
     page,
   }) => {
@@ -137,6 +192,11 @@ test.describe("Companies", () => {
     await expect(page.getByText(/^Deals \(/)).toBeVisible();
     await expect(page.getByText(/^Contacts \(/)).toBeVisible();
     await expect(page.getByText(/^Notes \(/)).toBeVisible();
+    // client status is editable on the record
+    await expect(page.getByLabel("Client type")).toBeVisible();
+    await expect(
+      page.getByRole("complementary").getByText("Client since"),
+    ).toBeVisible();
   });
 });
 
@@ -167,6 +227,13 @@ test.describe("Create a deal (end-to-end, self-cleaning)", () => {
         { message: "deal was not persisted", timeout: 10_000 },
       )
       .toBeGreaterThan(0);
+    // …with today's first-touch date (mandatory since 0017)
+    const { data: saved } = await admin
+      .from("deals")
+      .select("first_touch_date")
+      .eq("company", company)
+      .single();
+    expect(saved?.first_touch_date).toBe(new Date().toISOString().slice(0, 10));
 
     // and it's findable on the board via search
     await page.goto("/pipeline");

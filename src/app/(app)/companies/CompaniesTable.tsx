@@ -2,13 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { CLIENT_TYPES } from "@/lib/sources";
 import type { CompanyRow, Stage } from "@/lib/types";
+import ClientTag, { fmtDay } from "@/components/ClientTag";
 import CompanyDrawer from "./CompanyDrawer";
 import type { CurrentUser } from "../pipeline/DealDrawer";
 
 export const COMPANIES_PAGE = 200;
 
-type SortKey = "name" | "industry" | "country" | "deal_count";
+type SortKey = "name" | "client_status" | "client_since" | "deal_count";
+// client-status filter chips (Oleksandr, Sep 2026): "is this company a client?"
+type Filter = "all" | (typeof CLIENT_TYPES)[number];
 
 const SEARCH_COLS = ["name", "industry", "country", "city", "owner_code"];
 
@@ -26,6 +30,7 @@ export default function CompaniesTable({
   currentUser: CurrentUser;
 }) {
   const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [asc, setAsc] = useState(true);
 
@@ -35,7 +40,7 @@ export default function CompaniesTable({
   const [selected, setSelected] = useState<CompanyRow | null>(initialCompany);
   const didMount = useRef(false);
 
-  // server-side search/sort over the whole book (same pattern as Contacts)
+  // server-side search/filter/sort over the whole book (same pattern as Contacts)
   useEffect(() => {
     if (!didMount.current) {
       didMount.current = true;
@@ -47,8 +52,11 @@ export default function CompaniesTable({
       let query = supabase
         .from("v_companies")
         .select("*", { count: "exact" })
-        .order(sortKey, { ascending: asc })
+        .order(sortKey, { ascending: asc, nullsFirst: false })
+        .order("name")
         .limit(COMPANIES_PAGE);
+
+      if (filter !== "all") query = query.eq("client_status", filter);
 
       const term = q.trim().replace(/[,()]/g, " ").trim();
       if (term) {
@@ -63,19 +71,24 @@ export default function CompaniesTable({
       setLoading(false);
     }, 250);
     return () => clearTimeout(handle);
-  }, [q, sortKey, asc]);
+  }, [q, filter, sortKey, asc]);
 
   function sortBy(k: SortKey) {
     if (k === sortKey) setAsc((v) => !v);
     else {
       setSortKey(k);
-      // counts read best highest-first
-      setAsc(k !== "deal_count");
+      // counts and dates read best highest / newest first
+      setAsc(k === "name" || k === "client_status");
     }
   }
 
   const arrow = (k: SortKey) =>
     sortKey === k ? <span className="arrow">{asc ? "▲" : "▼"}</span> : null;
+
+  const FILTERS: { f: Filter; label: string }[] = [
+    { f: "all", label: "All" },
+    ...CLIENT_TYPES.map((t) => ({ f: t as Filter, label: t })),
+  ];
 
   return (
     <>
@@ -87,17 +100,26 @@ export default function CompaniesTable({
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search companies, industries, countries, owners"
         />
+        {FILTERS.map(({ f, label }) => (
+          <button
+            key={f}
+            className={`filterbtn${filter === f ? " on" : ""}`}
+            onClick={() => setFilter(f)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <div className="panel" style={{ overflowX: "auto" }}>
         <table>
           <thead>
             <tr>
               <th onClick={() => sortBy("name")}>Company{arrow("name")}</th>
-              <th onClick={() => sortBy("industry")}>
-                Industry{arrow("industry")}
+              <th onClick={() => sortBy("client_status")}>
+                Client type{arrow("client_status")}
               </th>
-              <th onClick={() => sortBy("country")}>
-                Country{arrow("country")}
+              <th onClick={() => sortBy("client_since")}>
+                Client since{arrow("client_since")}
               </th>
               <th>Owner</th>
               <th onClick={() => sortBy("deal_count")}>
@@ -119,8 +141,12 @@ export default function CompaniesTable({
                     <span style={{ color: "var(--text-faint)" }}> · {c.city}</span>
                   ) : null}
                 </td>
-                <td>{c.industry || "—"}</td>
-                <td>{c.country || "—"}</td>
+                <td>
+                  <ClientTag status={c.client_status} />
+                </td>
+                <td title={c.client_since ?? undefined}>
+                  {fmtDay(c.client_since)}
+                </td>
                 <td>{c.owner_name || c.owner_code || "—"}</td>
                 <td>{c.deal_count}</td>
                 <td>{c.contact_count}</td>

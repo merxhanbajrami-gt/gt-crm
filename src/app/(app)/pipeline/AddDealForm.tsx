@@ -31,6 +31,10 @@ export default function AddDealForm({
   const [linkedin, setLinkedin] = useState("");
   const [stage, setStage] = useState("connection");
   const [value, setValue] = useState("");
+  // mandatory (Oleksandr, Sep 2026): the dated scorecard counts leads by it
+  const [firstTouch, setFirstTouch] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
   const [clientType, setClientType] = useState("");
   const [source, setSource] = useState("");
   const [ownerCode, setOwnerCode] = useState(currentUser.repCode ?? "");
@@ -42,6 +46,10 @@ export default function AddDealForm({
     e.preventDefault();
     if (!company.trim()) {
       setError("Company is required.");
+      return;
+    }
+    if (!firstTouch) {
+      setError("First touch date is required.");
       return;
     }
     setBusy(true);
@@ -93,6 +101,7 @@ export default function AddDealForm({
         linkedin_url: normalizeUrl(linkedin) || null,
         stage,
         value: Math.max(0, Math.round(Number(value) || 0)),
+        first_touch_date: firstTouch,
         client_type: clientType || null,
         source: source || null,
         owner_code: ownerCode || null,
@@ -261,6 +270,17 @@ export default function AddDealForm({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
+              <div style={label}>First touch *</div>
+              <input
+                className="dedit"
+                type="date"
+                required
+                value={firstTouch}
+                onChange={(e) => setFirstTouch(e.target.value)}
+                aria-label="First touch"
+              />
+            </div>
+            <div>
               <div style={label}>Client type</div>
               <select
                 className="dedit"
@@ -275,6 +295,8 @@ export default function AddDealForm({
                 ))}
               </select>
             </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Lead source</div>
               <select
@@ -290,8 +312,6 @@ export default function AddDealForm({
                 ))}
               </select>
             </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <div style={label}>Owner</div>
               <PersonSelect

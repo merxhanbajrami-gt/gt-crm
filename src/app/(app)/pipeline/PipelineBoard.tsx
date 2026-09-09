@@ -63,10 +63,21 @@ export default function PipelineBoard({
     if (!deal || deal.stage === stage) return;
     // optimistic; the DB trigger stamps last_touched_at on the stage change
     const touched = new Date().toISOString();
+    // winning flips New / Ex-Client → Existing Client (DB trigger, 0017)
+    const clientType =
+      stage === "won" &&
+      (deal.client_type === "New Client" || deal.client_type === "Ex-Client")
+        ? "Existing Client"
+        : deal.client_type;
     setDeals((ds) =>
       ds.map((d) =>
         d.id === dealId
-          ? { ...d, stage: stage as Deal["stage"], last_touched_at: touched }
+          ? {
+              ...d,
+              stage: stage as Deal["stage"],
+              last_touched_at: touched,
+              client_type: clientType,
+            }
           : d,
       ),
     );

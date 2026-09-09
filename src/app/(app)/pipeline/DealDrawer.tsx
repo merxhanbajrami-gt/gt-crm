@@ -113,6 +113,8 @@ export default function DealDrawer({
     if (v !== (d.source ?? "")) patchDeal({ source: v || null });
   }
   function commitDate(field: "first_touch_date" | "close_date", v: string) {
+    // first touch is mandatory (0017) — an emptied picker just keeps the old date
+    if (field === "first_touch_date" && !v) return;
     const next = v || null;
     if (next !== (d[field] ?? null)) patchDeal({ [field]: next } as Partial<Deal>);
   }
@@ -247,6 +249,12 @@ export default function DealDrawer({
       patch.close_date = d.close_date ?? new Date().toISOString().slice(0, 10);
     if (reopening || stage === "won") patch.lost_reason = null;
     if (reopening) patch.close_date = null;
+    // signed → they're a client now (trigger rule from 0017, mirrored here)
+    if (
+      stage === "won" &&
+      (d.client_type === "New Client" || d.client_type === "Ex-Client")
+    )
+      patch.client_type = "Existing Client";
     if (lost) patch.lost_reason = lost.reason;
     const ok = await patchDeal(patch);
     if (!ok) return;
@@ -772,7 +780,8 @@ export default function DealDrawer({
               <input
                 className="dedit"
                 type="date"
-                value={d.first_touch_date ?? ""}
+                value={d.first_touch_date}
+                required
                 disabled={busy}
                 onChange={(e) => commitDate("first_touch_date", e.target.value)}
               />
