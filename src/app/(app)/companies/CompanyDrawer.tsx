@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { gbp } from "@/lib/format";
-import { CLIENT_TYPES } from "@/lib/sources";
+import { BUSINESS_SEGMENTS, CLIENT_TYPES } from "@/lib/sources";
 import LinkedInIcon from "@/components/LinkedInIcon";
 import NoteText from "@/components/NoteText";
-import ClientTag, { fmtDay } from "@/components/ClientTag";
+import ClientTag, { SegmentTag, fmtDay } from "@/components/ClientTag";
 import type {
   ActionItem,
   Company,
@@ -205,6 +205,7 @@ export default function CompanyDrawer({
             style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
           >
             <ClientTag status={c.client_status} />
+            <SegmentTag segment={c.business_segment} />
             <span>
               {c.client_since
                 ? `client since ${fmtDay(c.client_since)}`
@@ -324,6 +325,28 @@ export default function CompanyDrawer({
                 {c.won_count > 0
                   ? `first of ${c.won_count} won ${c.won_count === 1 ? "deal" : "deals"}`
                   : "date of the first won deal"}
+              </div>
+            </div>
+            <div className="dfield">
+              <div className="fl">Business segment</div>
+              <select
+                className="dedit"
+                value={c.business_segment}
+                disabled={busy}
+                onChange={(e) =>
+                  patchCompany({ business_segment: e.target.value })
+                }
+                aria-label="Business segment"
+              >
+                {BUSINESS_SEGMENTS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 4 }}>
+                A Defence deal sets this automatically · set it here to flag an
+                account before its first deal
               </div>
             </div>
           </div>

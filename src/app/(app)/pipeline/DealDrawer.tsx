@@ -5,7 +5,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { fmtAge, quietDays } from "@/lib/format";
 import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
-import { CLIENT_TYPES, LEAD_SOURCES, LOST_REASONS } from "@/lib/sources";
+import {
+  BUSINESS_SEGMENTS,
+  CLIENT_TYPES,
+  LEAD_SOURCES,
+  LOST_REASONS,
+} from "@/lib/sources";
 import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
@@ -103,6 +108,10 @@ export default function DealDrawer({
   }
   function commitClientType(v: string) {
     if (v !== (d.client_type ?? "")) patchDeal({ client_type: v || null });
+  }
+  // moving a deal to Defence also moves its company there (trigger, 0018)
+  function commitSegment(v: string) {
+    if (v !== d.business_segment) patchDeal({ business_segment: v });
   }
   // cleared name falls back to the company on the board (dealname || company)
   function commitDealname() {
@@ -689,6 +698,29 @@ export default function DealDrawer({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="dfield">
+              <div className="fl">Business segment</div>
+              <select
+                className="dedit"
+                value={d.business_segment}
+                disabled={busy}
+                onChange={(e) => commitSegment(e.target.value)}
+                aria-label="Business segment"
+              >
+                {BUSINESS_SEGMENTS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              {d.business_segment === "Defence" && (
+                <div
+                  style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 4 }}
+                >
+                  Its company is a Defence account
+                </div>
+              )}
             </div>
             {d.stage === "lost" && (
               <div className="dfield">

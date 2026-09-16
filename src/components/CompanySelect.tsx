@@ -7,6 +7,7 @@ interface Option {
   id: string;
   name: string;
   industry: string | null;
+  business_segment: string | null;
 }
 
 // Searchable company picker backed by the companies table. Typing reports the
@@ -22,7 +23,11 @@ export default function CompanySelect({
   placeholder = "Type a company…",
 }: {
   name: string;
-  onChange: (name: string, id: string | null) => void;
+  onChange: (
+    name: string,
+    id: string | null,
+    segment?: string | null,
+  ) => void;
   onCreatePick?: (name: string) => void;
   onDismiss?: () => void;
   placeholder?: string;
@@ -53,7 +58,7 @@ export default function CompanySelect({
       const supabase = createClient();
       let query = supabase
         .from("companies")
-        .select("id, name, industry")
+        .select("id, name, industry, business_segment")
         .order("name")
         .limit(8);
       const term = name.trim().replace(/[,()]/g, " ").trim();
@@ -105,7 +110,7 @@ export default function CompanySelect({
               className="ps-opt"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
-                onChange(o.name, o.id);
+                onChange(o.name, o.id, o.business_segment);
                 setOpen(false);
               }}
             >

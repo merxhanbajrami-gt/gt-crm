@@ -30,6 +30,33 @@ export default function ClientTag({ status }: { status: string | null }) {
   );
 }
 
+// Defence accounts only. Commercial is the general case and gets no tag —
+// marking every row would drown the signal (Oleksandr, Sep 2026).
+export function SegmentTag({ segment }: { segment: string | null }) {
+  if (segment !== "Defence") return null;
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        marginLeft: 6,
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 9.5,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        fontWeight: 600,
+        color: "var(--amber)",
+        border: "1px solid var(--amber)",
+        borderRadius: 4,
+        padding: "2px 6px",
+        whiteSpace: "nowrap",
+        verticalAlign: "middle",
+      }}
+    >
+      Defence
+    </span>
+  );
+}
+
 export function fmtDay(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {

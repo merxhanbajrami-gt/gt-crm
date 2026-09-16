@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CLIENT_TYPES } from "@/lib/sources";
+import { BUSINESS_SEGMENTS, CLIENT_TYPES } from "@/lib/sources";
 import type { CompanyRow, Stage } from "@/lib/types";
-import ClientTag, { fmtDay } from "@/components/ClientTag";
+import ClientTag, { SegmentTag, fmtDay } from "@/components/ClientTag";
 import CompanyDrawer from "./CompanyDrawer";
 import type { CurrentUser } from "../pipeline/DealDrawer";
 
@@ -13,6 +13,9 @@ export const COMPANIES_PAGE = 200;
 type SortKey = "name" | "client_status" | "client_since" | "deal_count";
 // client-status filter chips (Oleksandr, Sep 2026): "is this company a client?"
 type Filter = "all" | (typeof CLIENT_TYPES)[number];
+// Defence sells differently, so it gets a tab of its own rather than another
+// chip alongside client type — they are separate questions (Oleksandr, Sep 2026)
+type SegmentTab = "all" | (typeof BUSINESS_SEGMENTS)[number];
 
 const SEARCH_COLS = ["name", "industry", "country", "city", "owner_code"];
 
@@ -31,6 +34,7 @@ export default function CompaniesTable({
 }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [segment, setSegment] = useState<SegmentTab>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [asc, setAsc] = useState(true);
 
@@ -57,6 +61,7 @@ export default function CompaniesTable({
         .limit(COMPANIES_PAGE);
 
       if (filter !== "all") query = query.eq("client_status", filter);
+      if (segment !== "all") query = query.eq("business_segment", segment);
 
       const term = q.trim().replace(/[,()]/g, " ").trim();
       if (term) {
@@ -71,7 +76,7 @@ export default function CompaniesTable({
       setLoading(false);
     }, 250);
     return () => clearTimeout(handle);
-  }, [q, filter, sortKey, asc]);
+  }, [q, filter, segment, sortKey, asc]);
 
   function sortBy(k: SortKey) {
     if (k === sortKey) setAsc((v) => !v);
@@ -90,8 +95,24 @@ export default function CompaniesTable({
     ...CLIENT_TYPES.map((t) => ({ f: t as Filter, label: t })),
   ];
 
+  const SEGMENT_TABS: { s: SegmentTab; label: string }[] = [
+    { s: "all", label: "All companies" },
+    ...BUSINESS_SEGMENTS.map((s) => ({ s: s as SegmentTab, label: s })),
+  ];
+
   return (
     <>
+      <div className="tabs" style={{ marginLeft: 0, marginBottom: 12 }}>
+        {SEGMENT_TABS.map(({ s, label }) => (
+          <button
+            key={s}
+            className={`tab${segment === s ? " active" : ""}`}
+            onClick={() => setSegment(s)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="toolbar">
         <input
           className="search"
@@ -140,6 +161,7 @@ export default function CompaniesTable({
                   {c.city ? (
                     <span style={{ color: "var(--text-faint)" }}> · {c.city}</span>
                   ) : null}
+                  <SegmentTag segment={c.business_segment} />
                 </td>
                 <td>
                   <ClientTag status={c.client_status} />

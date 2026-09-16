@@ -37,6 +37,8 @@ export interface Deal {
   source: string | null;
   company_id: string | null;
   first_touch_date: string; // mandatory since 0017 (defaults to the creation day)
+  // Commercial | Defence — takes the company's segment at insert (0018)
+  business_segment: string;
   close_date: string | null;
   lost_reason: string | null;
   hot: boolean;
@@ -74,6 +76,8 @@ export interface Company {
   industry: string | null;
   // manual override of the derived client status; null = derive from deals
   client_type: string | null;
+  // Commercial | Defence — a Defence deal marks its company Defence (0018)
+  business_segment: string;
   last_activity: string | null;
   created_at: string;
   updated_at: string;

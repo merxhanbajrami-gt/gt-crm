@@ -31,6 +31,14 @@ export const CLIENT_TYPES = ["New Client", "Existing Client", "Ex-Client"] as co
 
 export type ClientType = (typeof CLIENT_TYPES)[number];
 
+// Which side of the business an account sits on (Oleksandr, Sep 2026). Defence
+// sells differently from the rest, so it gets its own tab on Companies and its
+// own field on a deal. Commercial is the general case; a Defence deal marks its
+// company Defence and later deals for that company default to Defence.
+export const BUSINESS_SEGMENTS = ["Commercial", "Defence"] as const;
+
+export type BusinessSegment = (typeof BUSINESS_SEGMENTS)[number];
+
 // Why a deal was lost — asked for when marking a deal lost, grouped on the
 // scorecard. Derived from the HubSpot "Closed Lost" dispositions.
 export const LOST_REASONS = [

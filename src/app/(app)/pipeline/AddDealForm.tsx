@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
+import { BUSINESS_SEGMENTS, CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
 import { normalizeUrl } from "@/components/LinkedInIcon";
 import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
@@ -36,6 +36,9 @@ export default function AddDealForm({
     new Date().toISOString().slice(0, 10),
   );
   const [clientType, setClientType] = useState("");
+  // Commercial unless the picked company is already Defence (Oleksandr, Sep 2026)
+  const [segment, setSegment] = useState<string>("Commercial");
+  const [companySegment, setCompanySegment] = useState<string | null>(null);
   const [source, setSource] = useState("");
   const [ownerCode, setOwnerCode] = useState(currentUser.repCode ?? "");
   const [hot, setHot] = useState(false);
@@ -103,6 +106,7 @@ export default function AddDealForm({
         value: Math.max(0, Math.round(Number(value) || 0)),
         first_touch_date: firstTouch,
         client_type: clientType || null,
+        business_segment: segment,
         source: source || null,
         owner_code: ownerCode || null,
         owner_name: ownerName,
@@ -179,9 +183,11 @@ export default function AddDealForm({
             <div style={label}>Company *</div>
             <CompanySelect
               name={company}
-              onChange={(name, id) => {
+              onChange={(name, id, seg) => {
                 setCompany(name);
                 setCompanyId(id);
+                setCompanySegment(seg ?? null);
+                if (seg) setSegment(seg);
               }}
               placeholder="Acme Corp"
             />
@@ -295,6 +301,27 @@ export default function AddDealForm({
                 ))}
               </select>
             </div>
+          </div>
+          <div>
+            <div style={label}>Business segment</div>
+            <select
+              className="dedit"
+              value={segment}
+              onChange={(e) => setSegment(e.target.value)}
+            >
+              {BUSINESS_SEGMENTS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            {segment === "Defence" && companySegment === "Commercial" && (
+              <div
+                style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}
+              >
+                This moves {company.trim()} to the Defence segment.
+              </div>
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
