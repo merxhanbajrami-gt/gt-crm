@@ -221,7 +221,20 @@ export default function WeekList({
         </p>
       )}
 
-      {visible.length === 0 ? (
+      {visible.length === 0 && who === "mine" && !currentUser.repCode ? (
+        // "All clear" would be a lie here: we cannot tell which tasks are
+        // theirs, so we say so instead of reporting an empty list (0019)
+        <div className="dayclear" style={{ display: "block" }}>
+          <div className="ring">?</div>
+          <div className="big">We don&apos;t know which tasks are yours.</div>
+          <div className="sub">
+            Your account isn&apos;t linked to a rep code yet, so &ldquo;My
+            tasks&rdquo; can&apos;t match anything — this isn&apos;t an empty
+            list. Ask an admin to add you to the team roster, then sign in
+            again. In the meantime, All tasks shows everything.
+          </div>
+        </div>
+      ) : visible.length === 0 ? (
         <div className="dayclear" style={{ display: "block" }}>
           <div className="ring">✓</div>
           <div className="big">All clear.</div>
