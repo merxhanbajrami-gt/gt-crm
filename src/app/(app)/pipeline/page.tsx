@@ -2,15 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
 import { getActiveOwners, getTaskAssignees } from "@/lib/owners";
 import { TASK_KIND } from "@/lib/cadence";
+import { parseFilters } from "@/lib/dealFilters";
 import type { Deal, Stage } from "@/lib/types";
 import PipelineBoard from "./PipelineBoard";
 
 export default async function PipelinePage({
   searchParams,
 }: {
-  searchParams: Promise<{ deal?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { deal: initialDealId } = await searchParams;
+  const params = await searchParams;
+  const initialDealId = typeof params.deal === "string" ? params.deal : null;
   const supabase = await createClient();
   const user = await getSessionUser();
 
@@ -50,7 +52,8 @@ export default async function PipelinePage({
       <p className="view-sub">
         {boardDeals.length} live cards from the pipeline. Each column is a
         job, not a label. Drag a card to restage it. Amber dot means the deal is
-        flagged hot. Columns scroll.
+        flagged hot. Columns scroll. Filters stay in the link, so you can share
+        a filtered view.
       </p>
       <PipelineBoard
         stages={boardStages as Stage[]}
@@ -58,7 +61,8 @@ export default async function PipelinePage({
         owners={owners as [string, string][]}
         assignees={assignees as [string, string][]}
         dealsWithTask={dealsWithTask}
-        initialDealId={initialDealId ?? null}
+        initialDealId={initialDealId}
+        initialFilters={parseFilters(params)}
         currentUser={{
           id: user!.id,
           fullName: user!.fullName,

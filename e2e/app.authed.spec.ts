@@ -87,6 +87,67 @@ test.describe("Pipeline", () => {
     await expect(page.getByText("Connection")).toBeVisible();
     await expect(page.getByText("Won")).toBeVisible();
   });
+
+  test.describe("filters", () => {
+    // filter by lead source, first touch and more (Oleksandr, Oct 2026)
+    const eventCo = `${TEST_DEAL_PREFIX} Filter Event Co`;
+    const partnerCo = `${TEST_DEAL_PREFIX} Filter Partner Co`;
+
+    test.beforeAll(async () => {
+      const admin = adminClient();
+      const { error } = await admin.from("deals").insert([
+        {
+          company: eventCo,
+          stage: "connection",
+          owner_code: "E2E",
+          source: "Event",
+          first_touch_date: "2024-02-10",
+        },
+        {
+          company: partnerCo,
+          stage: "connection",
+          owner_code: "E2E",
+          source: "Partner",
+          first_touch_date: "2025-07-01",
+        },
+      ]);
+      if (error) throw error;
+      // both deals are wiped by the global afterAll
+    });
+
+    test("lead source and first touch narrow the board via the URL", async ({
+      page,
+    }) => {
+      await page.goto("/pipeline");
+      await expect(page.getByText(eventCo)).toBeVisible();
+      await expect(page.getByText(partnerCo)).toBeVisible();
+
+      await page.getByLabel("Lead source").selectOption("Event");
+      await expect(page.getByText(eventCo)).toBeVisible();
+      await expect(page.getByText(partnerCo)).not.toBeVisible();
+      await expect(page).toHaveURL(/source=Event/);
+
+      await page.getByLabel("Lead source").selectOption("all");
+      await page
+        .getByLabel("First touch", { exact: true })
+        .selectOption("custom");
+      await page.getByLabel("First touch from").fill("2025-01-01");
+      await expect(page.getByText(partnerCo)).toBeVisible();
+      await expect(page.getByText(eventCo)).not.toBeVisible();
+
+      // the link reproduces the filtered view
+      await page.reload();
+      await expect(page.getByLabel("First touch from")).toHaveValue(
+        "2025-01-01",
+      );
+      await expect(page.getByText(partnerCo)).toBeVisible();
+      await expect(page.getByText(eventCo)).not.toBeVisible();
+
+      await page.getByRole("button", { name: "Clear all" }).click();
+      await expect(page.getByText(eventCo)).toBeVisible();
+      await expect(page).toHaveURL(/\/pipeline$/);
+    });
+  });
 });
 
 test.describe("Contacts", () => {

@@ -20,6 +20,11 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
+    // Pure logic (no browser, no server, no secrets) — fast, runs anywhere.
+    {
+      name: "unit",
+      testMatch: /.*\.unit\.spec\.ts/,
+    },
     // Public, unauthenticated surface — runs anywhere, no secrets needed.
     {
       name: "smoke",
