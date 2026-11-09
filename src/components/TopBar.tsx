@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ROLE_LABEL, tabAllowed } from "@/lib/access";
 import type { SessionUser } from "@/lib/types";
 
 const TABS = [
@@ -14,12 +15,6 @@ const TABS = [
   { href: "/ideas", label: "Ideas" },
 ];
 
-const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin",
-  manager: "Manager · Founder view",
-  rep: "Sales · Rep",
-};
-
 export default function TopBar({ user }: { user: SessionUser }) {
   const pathname = usePathname();
 
@@ -30,7 +25,7 @@ export default function TopBar({ user }: { user: SessionUser }) {
         <span className="os">/ OS · PIPELINE</span>
       </div>
       <nav className="tabs" role="tablist">
-        {TABS.map((t) => {
+        {TABS.filter((t) => tabAllowed(user.role, t.href)).map((t) => {
           const active =
             t.href === "/" ? pathname === "/" : pathname.startsWith(t.href);
           return (

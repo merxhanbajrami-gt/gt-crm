@@ -32,6 +32,7 @@ export default async function LostPage() {
           id: user!.id,
           fullName: user!.fullName,
           repCode: user!.repCode,
+          role: user!.role,
         }}
       />
     </section>

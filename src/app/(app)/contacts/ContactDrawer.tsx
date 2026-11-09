@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { isGuest } from "@/lib/access";
 import { gbp } from "@/lib/format";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
 import NoteText from "@/components/NoteText";
@@ -285,7 +286,9 @@ export default function ContactDrawer({
                   setCompanyName(name);
                   if (id) patchContact({ company_id: id });
                 }}
-                onCreatePick={createAndLinkCompany}
+                onCreatePick={
+                  isGuest(currentUser.role) ? undefined : createAndLinkCompany
+                }
                 onDismiss={() => setCompanyName(companyName)}
                 placeholder="Link a company…"
               />
@@ -374,22 +377,24 @@ export default function ContactDrawer({
             ))}
           </div>
 
-          {/* danger zone */}
-          <div
-            style={{
-              marginTop: 28,
-              paddingTop: 16,
-              borderTop: "1px solid var(--border)",
-            }}
-          >
-            <button
-              className="deal-delete"
-              disabled={busy}
-              onClick={deleteContact}
+          {/* danger zone — guests can't delete */}
+          {!isGuest(currentUser.role) && (
+            <div
+              style={{
+                marginTop: 28,
+                paddingTop: 16,
+                borderTop: "1px solid var(--border)",
+              }}
             >
-              Delete contact
-            </button>
-          </div>
+              <button
+                className="deal-delete"
+                disabled={busy}
+                onClick={deleteContact}
+              >
+                Delete contact
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>

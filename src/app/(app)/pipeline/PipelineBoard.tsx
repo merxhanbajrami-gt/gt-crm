@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { canShareDeals, isGuest } from "@/lib/access";
 import { ageClass, fmtAge, gbp, quietDays } from "@/lib/format";
 import {
   ALL,
@@ -38,6 +39,7 @@ export default function PipelineBoard({
   assignees,
   currentUser,
   dealsWithTask = [],
+  sharedDealIds = [],
   initialDealId = null,
   initialFilters = NO_FILTERS,
 }: {
@@ -47,12 +49,16 @@ export default function PipelineBoard({
   assignees: [string, string][];
   currentUser: CurrentUser;
   dealsWithTask?: string[];
+  // deals shared with a guest; marked on the card for admins and managers
+  sharedDealIds?: string[];
   initialDealId?: string | null;
   initialFilters?: DealFilters;
 }) {
   const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const withTask = useMemo(() => new Set(dealsWithTask), [dealsWithTask]);
+  const shared = useMemo(() => new Set(sharedDealIds), [sharedDealIds]);
+  const showShared = canShareDeals(currentUser.role);
   const [filters, setFilters] = useState<DealFilters>(initialFilters);
   const [dragId, setDragId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialDealId);
@@ -176,9 +182,11 @@ export default function PipelineBoard({
           flexWrap: "wrap",
         }}
       >
-        <button className="addbtn" onClick={() => setAdding(true)}>
-          + Add deal
-        </button>
+        {!isGuest(currentUser.role) && (
+          <button className="addbtn" onClick={() => setAdding(true)}>
+            + Add deal
+          </button>
+        )}
         <input
           className="search"
           type="text"
@@ -371,15 +379,25 @@ export default function PipelineBoard({
                               ? fmtAge(quiet) + " quiet"
                               : "active today"}
                         </span>
-                        <span
-                          className="owner-dot"
-                          style={{
-                            width: 22,
-                            height: 22,
-                            fontSize: "8.5px",
-                          }}
-                        >
-                          {d.owner_code}
+                        <span className="kfoot-r">
+                          {showShared && shared.has(d.id) && (
+                            <span
+                              className="shared-chip"
+                              title="Visible to a guest"
+                            >
+                              shared
+                            </span>
+                          )}
+                          <span
+                            className="owner-dot"
+                            style={{
+                              width: 22,
+                              height: 22,
+                              fontSize: "8.5px",
+                            }}
+                          >
+                            {d.owner_code}
+                          </span>
                         </span>
                       </div>
                     </div>

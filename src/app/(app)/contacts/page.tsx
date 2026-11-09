@@ -49,6 +49,7 @@ export default async function ContactsPage({
           id: user!.id,
           fullName: user!.fullName,
           repCode: user!.repCode,
+          role: user!.role,
         }}
       />
     </section>

@@ -15,7 +15,7 @@ function decodeRole(accessToken: string | undefined): AppRole {
       Buffer.from(accessToken.split(".")[1], "base64").toString(),
     );
     const r = payload.user_role;
-    return r === "admin" || r === "manager" ? r : "rep";
+    return r === "admin" || r === "manager" || r === "guest" ? r : "rep";
   } catch {
     return "rep";
   }

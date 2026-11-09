@@ -1,11 +1,6 @@
 import { getSessionUser } from "@/lib/session";
+import { ROLE_LABEL } from "@/lib/access";
 import ChangePasswordForm from "./ChangePasswordForm";
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin",
-  manager: "Manager · Founder view",
-  rep: "Sales · Rep",
-};
 
 export default async function AccountPage() {
   const user = await getSessionUser();

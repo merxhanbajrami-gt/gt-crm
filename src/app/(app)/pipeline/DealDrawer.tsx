@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { canShareDeals, isGuest } from "@/lib/access";
 import { fmtAge, quietDays } from "@/lib/format";
 import { TOUCH_KINDS, TASK_KIND, touchStatus } from "@/lib/cadence";
 import {
@@ -15,7 +17,7 @@ import PersonSelect from "@/components/PersonSelect";
 import CompanySelect from "@/components/CompanySelect";
 import LinkedInIcon, { normalizeUrl } from "@/components/LinkedInIcon";
 import NoteText from "@/components/NoteText";
-import type { ActionItem, Contact, Deal, Stage } from "@/lib/types";
+import type { ActionItem, AppRole, Contact, Deal, Stage } from "@/lib/types";
 
 const DAY = 86400000;
 // Cadence / "log a touch" hidden per Jul 2026 feedback (unsure it's needed).
@@ -26,6 +28,12 @@ export interface CurrentUser {
   id: string;
   fullName: string;
   repCode: string | null;
+  role: AppRole;
+}
+
+interface Guest {
+  id: string;
+  name: string;
 }
 
 function fmtDate(iso: string) {
@@ -64,6 +72,10 @@ export default function DealDrawer({
   onDeleted: (id: string) => void;
 }) {
   const supabase = createClient();
+  const router = useRouter();
+  // a guest works the deal but can't reassign, delete or create records (0020)
+  const guest = isGuest(currentUser.role);
+  const canShare = canShareDeals(currentUser.role);
   const [d, setD] = useState<Deal>(deal);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [note, setNote] = useState("");
@@ -101,6 +113,9 @@ export default function DealDrawer({
   const [etObjective, setEtObjective] = useState("");
   const [etDue, setEtDue] = useState("");
   const [etAssignee, setEtAssignee] = useState("");
+  // guest access: every guest sign-in, and the ones this deal is shared with
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [sharedWith, setSharedWith] = useState<Set<string>>(new Set());
 
   function commitValue() {
     const n = Math.max(0, Math.round(Number(valueInput) || 0));
@@ -177,10 +192,60 @@ export default function DealDrawer({
       .then(({ data }) => {
         if (active) setContacts((data ?? []) as Contact[]);
       });
+    if (canShare) {
+      Promise.all([
+        supabase.from("user_roles").select("user_id").eq("role", "guest"),
+        supabase.from("deal_shares").select("user_id").eq("deal_id", deal.id),
+      ]).then(async ([{ data: roles }, { data: shares }]) => {
+        const ids = (roles ?? []).map((r) => r.user_id as string);
+        const { data: people } = ids.length
+          ? await supabase
+              .from("profiles")
+              .select("id, full_name, email")
+              .in("id", ids)
+          : { data: [] };
+        if (!active) return;
+        setGuests(
+          (people ?? [])
+            .map((p) => ({
+              id: p.id as string,
+              name: (p.full_name as string | null) || (p.email as string),
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        setSharedWith(new Set((shares ?? []).map((x) => x.user_id as string)));
+      });
+    }
     return () => {
       active = false;
     };
-  }, [supabase, deal.id]);
+  }, [supabase, deal.id, canShare]);
+
+  // ---- guest access ----
+  async function toggleShare(userId: string, on: boolean) {
+    setBusy(true);
+    const { error } = on
+      ? await supabase
+          .from("deal_shares")
+          .insert({ deal_id: d.id, user_id: userId })
+      : await supabase
+          .from("deal_shares")
+          .delete()
+          .eq("deal_id", d.id)
+          .eq("user_id", userId);
+    setBusy(false);
+    if (error) {
+      alert("Could not change access: " + error.message);
+      return;
+    }
+    setSharedWith((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+    router.refresh(); // the board marks shared cards
+  }
 
   // ---- linked contacts ----
   async function addContact() {
@@ -618,7 +683,7 @@ export default function DealDrawer({
                   setCompanyInput(name);
                   if (id) patchDeal({ company: name, company_id: id });
                 }}
-                onCreatePick={createAndLinkCompany}
+                onCreatePick={guest ? undefined : createAndLinkCompany}
                 onDismiss={() => setCompanyInput(d.company ?? "")}
                 placeholder="Link a company…"
               />
@@ -830,6 +895,30 @@ export default function DealDrawer({
             </div>
           </div>
 
+          {/* guest access — who outside the team can see this deal (0020) */}
+          {canShare && guests.length > 0 && (
+            <>
+              <div className="dsection">Guest access</div>
+              <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+                {guests.map((g) => (
+                  <label key={g.id} className="share-row">
+                    <input
+                      type="checkbox"
+                      checked={sharedWith.has(g.id)}
+                      disabled={busy}
+                      onChange={(e) => toggleShare(g.id, e.target.checked)}
+                    />
+                    Visible to {g.name}
+                  </label>
+                ))}
+                <div className="share-hint">
+                  A guest sees only the deals shared with them, with their
+                  linked contacts and company, and can edit them.
+                </div>
+              </div>
+            </>
+          )}
+
           {/* linked contacts — a deal can have more than just its primary contact */}
           <div className="dsection">Contacts</div>
           <div className="timeline" style={{ marginBottom: 12 }}>
@@ -850,14 +939,16 @@ export default function DealDrawer({
                     {[c.title, c.email].filter(Boolean).join(" · ") || "—"}
                   </div>
                 </div>
-                <button
-                  className="ctx-del"
-                  style={{ marginLeft: "auto" }}
-                  onClick={() => deleteContact(c)}
-                  title="Remove contact"
-                >
-                  delete
-                </button>
+                {!guest && (
+                  <button
+                    className="ctx-del"
+                    style={{ marginLeft: "auto" }}
+                    onClick={() => deleteContact(c)}
+                    title="Remove contact"
+                  >
+                    delete
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -945,28 +1036,32 @@ export default function DealDrawer({
             </>
           )}
 
-          {/* assignee */}
-          <div className="dsection">Assignee</div>
-          <div className="assign-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <PersonSelect
-                owners={reassignOwners}
-                value={d.owner_code ?? ""}
-                onChange={(code) => code && reassign(code)}
-                placeholder="Type a name…"
-                allowUnassigned={false}
-              />
-            </div>
-            <button
-              className={`assign-me ${
-                d.owner_code === currentUser.repCode ? "mine" : ""
-              }`}
-              disabled={busy}
-              onClick={assignToMe}
-            >
-              {d.owner_code === currentUser.repCode ? "✓ Yours" : "Assign to me"}
-            </button>
-          </div>
+          {/* assignee — a guest can't reassign the owner */}
+          {!guest && (
+            <>
+              <div className="dsection">Assignee</div>
+              <div className="assign-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <PersonSelect
+                    owners={reassignOwners}
+                    value={d.owner_code ?? ""}
+                    onChange={(code) => code && reassign(code)}
+                    placeholder="Type a name…"
+                    allowUnassigned={false}
+                  />
+                </div>
+                <button
+                  className={`assign-me ${
+                    d.owner_code === currentUser.repCode ? "mine" : ""
+                  }`}
+                  disabled={busy}
+                  onClick={assignToMe}
+                >
+                  {d.owner_code === currentUser.repCode ? "✓ Yours" : "Assign to me"}
+                </button>
+              </div>
+            </>
+          )}
 
           {/* tasks */}
           <div className="dsection">Tasks</div>
@@ -1217,22 +1312,24 @@ export default function DealDrawer({
             })}
           </div>
 
-          {/* danger zone */}
-          <div
-            style={{
-              marginTop: 28,
-              paddingTop: 16,
-              borderTop: "1px solid var(--border)",
-            }}
-          >
-            <button
-              className="deal-delete"
-              disabled={busy}
-              onClick={deleteDeal}
+          {/* danger zone — guests can't delete */}
+          {!guest && (
+            <div
+              style={{
+                marginTop: 28,
+                paddingTop: 16,
+                borderTop: "1px solid var(--border)",
+              }}
             >
-              Delete deal
-            </button>
-          </div>
+              <button
+                className="deal-delete"
+                disabled={busy}
+                onClick={deleteDeal}
+              >
+                Delete deal
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

@@ -1,11 +1,14 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
+import { GUEST_HOME, isGuest } from "@/lib/access";
 import type { Idea } from "@/lib/types";
 import IdeaBoard from "./IdeaBoard";
 
 export default async function IdeasPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
+  if (user && isGuest(user.role)) redirect(GUEST_HOME);
 
   const { data } = await supabase
     .from("ideas")

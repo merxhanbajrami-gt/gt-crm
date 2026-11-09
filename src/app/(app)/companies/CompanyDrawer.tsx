@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { isGuest } from "@/lib/access";
 import { gbp } from "@/lib/format";
 import { BUSINESS_SEGMENTS, CLIENT_TYPES } from "@/lib/sources";
 import LinkedInIcon from "@/components/LinkedInIcon";
@@ -468,22 +469,24 @@ export default function CompanyDrawer({
             ))}
           </div>
 
-          {/* danger zone */}
-          <div
-            style={{
-              marginTop: 28,
-              paddingTop: 16,
-              borderTop: "1px solid var(--border)",
-            }}
-          >
-            <button
-              className="deal-delete"
-              disabled={busy}
-              onClick={deleteCompany}
+          {/* danger zone — guests can't delete */}
+          {!isGuest(currentUser.role) && (
+            <div
+              style={{
+                marginTop: 28,
+                paddingTop: 16,
+                borderTop: "1px solid var(--border)",
+              }}
             >
-              Delete company
-            </button>
-          </div>
+              <button
+                className="deal-delete"
+                disabled={busy}
+                onClick={deleteCompany}
+              >
+                Delete company
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>

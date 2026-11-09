@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
 import { getActiveOwners, getTaskAssignees } from "@/lib/owners";
 import { TASK_KIND } from "@/lib/cadence";
+import { GUEST_HOME, isGuest } from "@/lib/access";
 import type { Deal, Stage } from "@/lib/types";
 import WeekList, { type TaskRow } from "./WeekList";
 import AddDealButton from "./AddDealButton";
@@ -19,6 +21,7 @@ interface TaskQueryRow {
 export default async function MyWeekPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
+  if (user && isGuest(user.role)) redirect(GUEST_HOME);
 
   // Open tasks assigned to the current user (RLS scopes reps to their own,
   // managers see the whole team). Each task carries its deal for context.
@@ -65,7 +68,7 @@ export default async function MyWeekPage() {
     (r) => r.due_date != null && r.due_date < todayStr,
   ).length;
   const first = user?.fullName.split(" ")[0] ?? "there";
-  const isManager = user?.role !== "rep";
+  const isManager = user?.role === "admin" || user?.role === "manager";
 
   return (
     <section className="view active">
@@ -100,6 +103,7 @@ export default async function MyWeekPage() {
               id: user!.id,
               fullName: user!.fullName,
               repCode: user!.repCode,
+              role: user!.role,
             }}
           />
         </div>
@@ -115,6 +119,7 @@ export default async function MyWeekPage() {
           id: user!.id,
           fullName: user!.fullName,
           repCode: user!.repCode,
+          role: user!.role,
         }}
         canFilterPeople={isManager}
       />

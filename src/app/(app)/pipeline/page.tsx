@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { getActiveOwners, getTaskAssignees } from "@/lib/owners";
 import { TASK_KIND } from "@/lib/cadence";
 import { parseFilters } from "@/lib/dealFilters";
+import { canShareDeals } from "@/lib/access";
 import type { Deal, Stage } from "@/lib/types";
 import PipelineBoard from "./PipelineBoard";
 
@@ -16,20 +17,30 @@ export default async function PipelinePage({
   const supabase = await createClient();
   const user = await getSessionUser();
 
-  const [{ data: stages }, { data: deals }, { data: openTasks }, owners, assignees] =
-    await Promise.all([
-      supabase.from("stages").select("*").order("sort"),
-      supabase.from("deals").select("*").order("value", { ascending: false }),
-      // open tasks → which deals already have a next action
-      supabase
-        .from("actions")
-        .select("deal_id")
-        .eq("kind", TASK_KIND)
-        .eq("done", false),
-      // owners = curated team list (active); assignees = the task-taking subset
-      getActiveOwners(supabase),
-      getTaskAssignees(supabase),
-    ]);
+  const [
+    { data: stages },
+    { data: deals },
+    { data: openTasks },
+    owners,
+    assignees,
+    { data: shares },
+  ] = await Promise.all([
+    supabase.from("stages").select("*").order("sort"),
+    supabase.from("deals").select("*").order("value", { ascending: false }),
+    // open tasks → which deals already have a next action
+    supabase
+      .from("actions")
+      .select("deal_id")
+      .eq("kind", TASK_KIND)
+      .eq("done", false),
+    // owners = curated team list (active); assignees = the task-taking subset
+    getActiveOwners(supabase),
+    getTaskAssignees(supabase),
+    // deals shared with a guest (0020) — only managers mark them
+    user && canShareDeals(user.role)
+      ? supabase.from("deal_shares").select("deal_id")
+      : Promise.resolve({ data: [] as { deal_id: string }[] }),
+  ]);
 
   // The board is the working pipeline; lost deals live under the dedicated
   // Lost tab, so keep that column off the board (6 columns wrap and break).
@@ -61,12 +72,16 @@ export default async function PipelinePage({
         owners={owners as [string, string][]}
         assignees={assignees as [string, string][]}
         dealsWithTask={dealsWithTask}
+        sharedDealIds={Array.from(
+          new Set((shares ?? []).map((s) => s.deal_id as string)),
+        )}
         initialDealId={initialDealId}
         initialFilters={parseFilters(params)}
         currentUser={{
           id: user!.id,
           fullName: user!.fullName,
           repCode: user!.repCode,
+          role: user!.role,
         }}
       />
       <div className="legend">

@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "manager" | "rep";
+export type AppRole = "admin" | "manager" | "rep" | "guest";
 
 export type StageId =
   | "connection"

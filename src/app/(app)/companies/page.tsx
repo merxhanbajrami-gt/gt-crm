@@ -54,6 +54,7 @@ export default async function CompaniesPage({
           id: user!.id,
           fullName: user!.fullName,
           repCode: user!.repCode,
+          role: user!.role,
         }}
       />
     </section>

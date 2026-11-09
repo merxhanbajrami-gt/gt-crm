@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/session";
+import { GUEST_HOME, isGuest } from "@/lib/access";
 import { gbp } from "@/lib/format";
 import { resolveRange } from "@/lib/dateRange";
 import RangePicker from "./RangePicker";
@@ -119,6 +122,8 @@ export default async function ScorecardPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
+  const user = await getSessionUser();
+  if (user && isGuest(user.role)) redirect(GUEST_HOME);
   const range = resolveRange(await searchParams);
   const supabase = await createClient();
   const [{ data: ranged }, { data: summary }, { data: byStage }] =
