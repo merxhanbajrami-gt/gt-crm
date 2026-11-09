@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { gbp } from "@/lib/format";
+import { isGuest } from "@/lib/access";
 import type { Deal, Stage } from "@/lib/types";
 import DealDrawer, { type CurrentUser } from "./pipeline/DealDrawer";
 
@@ -19,6 +20,8 @@ export interface TaskRow {
   dealname: string | null;
   value: number;
   hot: boolean;
+  // false for a team task in a guest's list: shown, but not done/rescheduled
+  editable: boolean;
 }
 
 type View = "week" | "month";
@@ -76,8 +79,9 @@ export default function WeekList({
   const [teammate, setTeammate] = useState<string>(teammates[0]?.[0] ?? "");
   const teammateName =
     teammates.find(([code]) => code === teammate)?.[1] ?? teammate;
-  const title =
-    !canFilterPeople || who === "mine"
+  const title = isGuest(currentUser.role)
+    ? "Tasks on your deals"
+    : !canFilterPeople || who === "mine"
       ? "Your tasks"
       : who === "teammate"
         ? `${teammateName}'s tasks`
@@ -296,24 +300,28 @@ export default function WeekList({
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    className="dedit"
-                    type="date"
-                    value={r.due_date ?? ""}
-                    onChange={(e) => reschedule(r, e.target.value)}
-                    title="Reschedule due date"
-                    style={{ padding: "5px 8px", fontSize: 12, width: 140 }}
-                  />
+                  {r.editable && (
+                    <input
+                      className="dedit"
+                      type="date"
+                      value={r.due_date ?? ""}
+                      onChange={(e) => reschedule(r, e.target.value)}
+                      title="Reschedule due date"
+                      style={{ padding: "5px 8px", fontSize: 12, width: 140 }}
+                    />
+                  )}
                   <span className={`a-due ${cls}`}>{text}</span>
                 </div>
-                <button
-                  className="cad-btn"
-                  style={{ padding: "6px 12px", fontSize: 12 }}
-                  disabled={busyId === r.id}
-                  onClick={() => complete(r)}
-                >
-                  {busyId === r.id ? "…" : "Done"}
-                </button>
+                {r.editable && (
+                  <button
+                    className="cad-btn"
+                    style={{ padding: "6px 12px", fontSize: 12 }}
+                    disabled={busyId === r.id}
+                    onClick={() => complete(r)}
+                  >
+                    {busyId === r.id ? "…" : "Done"}
+                  </button>
+                )}
               </div>
             );
           })}

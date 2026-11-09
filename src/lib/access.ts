@@ -19,9 +19,10 @@ export function canShareDeals(role: AppRole): boolean {
   return role === "admin" || role === "manager";
 }
 
-// My Week, Scorecard and Ideas are team views; a guest keeps the views that
-// list its shared records
-const GUEST_TABS = new Set(["/pipeline", "/lost", "/contacts", "/companies"]);
+// Scorecard and Ideas are team views; a guest keeps the views that list its
+// shared records. My Week shows a guest the tasks on its shared deals
+// (Oleksandr, Nov 2026).
+const GUEST_TABS = new Set(["/", "/pipeline", "/lost", "/contacts", "/companies"]);
 
 export function tabAllowed(role: AppRole, href: string): boolean {
   return !isGuest(role) || GUEST_TABS.has(href);

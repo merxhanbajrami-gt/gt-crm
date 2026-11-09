@@ -29,8 +29,9 @@ test("admins and managers share deals; reps and guests don't", () => {
   expect(ROLES.filter(canShareDeals)).toEqual(["admin", "manager"]);
 });
 
-test("a guest keeps Pipeline, Lost, Contacts and Companies", () => {
+test("a guest keeps My Week, Pipeline, Lost, Contacts and Companies", () => {
   expect(TABS.filter((t) => tabAllowed("guest", t))).toEqual([
+    "/",
     "/pipeline",
     "/lost",
     "/contacts",

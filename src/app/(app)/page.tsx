@@ -1,9 +1,8 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/session";
 import { getActiveOwners, getTaskAssignees } from "@/lib/owners";
 import { TASK_KIND } from "@/lib/cadence";
-import { GUEST_HOME, isGuest } from "@/lib/access";
+import { isGuest } from "@/lib/access";
 import type { Deal, Stage } from "@/lib/types";
 import WeekList, { type TaskRow } from "./WeekList";
 import AddDealButton from "./AddDealButton";
@@ -15,21 +14,24 @@ interface TaskQueryRow {
   note: string | null;
   due_date: string | null;
   owner_code: string | null;
+  owner_id: string | null;
+  created_by: string | null;
   deal: Deal | null;
 }
 
 export default async function MyWeekPage() {
   const supabase = await createClient();
   const user = await getSessionUser();
-  if (user && isGuest(user.role)) redirect(GUEST_HOME);
+  const guest = !!user && isGuest(user.role);
 
   // Open tasks assigned to the current user (RLS scopes reps to their own,
-  // managers see the whole team). Each task carries its deal for context.
+  // managers see the whole team, a guest the tasks on its shared deals).
+  // Each task carries its deal for context.
   const [{ data: taskData }, { data: stageData }, owners, assignees] =
     await Promise.all([
       supabase
         .from("actions")
-        .select("id, note, due_date, owner_code, deal:deals(*)")
+        .select("id, note, due_date, owner_code, owner_id, created_by, deal:deals(*)")
         .eq("kind", TASK_KIND)
         .eq("done", false)
         .order("due_date", { ascending: true, nullsFirst: false })
@@ -56,6 +58,11 @@ export default async function MyWeekPage() {
     dealname: t.deal?.dealname ?? null,
     value: t.deal?.value ?? 0,
     hot: t.deal?.hot ?? false,
+    // a guest edits only its own tasks (0021); the team's stay read-only
+    editable:
+      !guest ||
+      t.owner_id === user!.id ||
+      (t.owner_id === null && t.created_by === user!.id),
   }));
 
   // one deal row per task-linked deal, for the in-place drawer
@@ -88,6 +95,7 @@ export default async function MyWeekPage() {
             <>
               {rows.length} open {isManager ? "team " : ""}
               {rows.length === 1 ? "task" : "tasks"}
+              {guest ? " on your deals" : ""}
               {overdueCount > 0 ? ` — ${overdueCount} overdue` : ""}. Tick each
               one off as you go.
             </>
@@ -95,18 +103,20 @@ export default async function MyWeekPage() {
             <>No open tasks. Add tasks from any deal to plan your week.</>
           )}
         </p>
-        <div style={{ marginTop: 18 }}>
-          <AddDealButton
-            stages={stages}
-            owners={owners}
-            currentUser={{
-              id: user!.id,
-              fullName: user!.fullName,
-              repCode: user!.repCode,
-              role: user!.role,
-            }}
-          />
-        </div>
+        {!guest && (
+          <div style={{ marginTop: 18 }}>
+            <AddDealButton
+              stages={stages}
+              owners={owners}
+              currentUser={{
+                id: user!.id,
+                fullName: user!.fullName,
+                repCode: user!.repCode,
+                role: user!.role,
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <WeekList
