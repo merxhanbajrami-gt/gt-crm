@@ -42,10 +42,11 @@ export default async function PipelinePage({
       : Promise.resolve({ data: [] as { deal_id: string }[] }),
   ]);
 
-  // The board is the working pipeline; lost deals live under the dedicated
-  // Lost tab, so keep that column off the board (6 columns wrap and break).
-  const boardStages = (stages ?? []).filter((s) => s.id !== "lost");
-  const boardDeals = (deals ?? []).filter((d) => d.stage !== "lost");
+  // Lost sits right of Won, so the whole book reads on one page (Oleksandr,
+  // Nov 2026). The Lost tab stays for the table view and lost-reason sorting.
+  const boardStages = stages ?? [];
+  const boardDeals = deals ?? [];
+  const lostCount = boardDeals.filter((d) => d.stage === "lost").length;
 
   // deals that already have an active (incomplete) task
   const dealsWithTask = Array.from(
@@ -61,8 +62,8 @@ export default async function PipelinePage({
       <div className="eyebrow">Deal flow</div>
       <h1 className="view-title">Where every lead stands</h1>
       <p className="view-sub">
-        {boardDeals.length} live cards from the pipeline. Each column is a
-        job, not a label. Drag a card to restage it. Amber dot means the deal is
+        {boardDeals.length - lostCount} live cards from the pipeline, plus{" "}
+        {lostCount} lost on the right. Each column is a job, not a label. Drag a card to restage it. Amber dot means the deal is
         flagged hot. Columns scroll. Filters stay in the link, so you can share
         a filtered view.
       </p>

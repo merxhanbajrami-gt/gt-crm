@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { canShareDeals, isGuest } from "@/lib/access";
-import { ageClass, fmtAge, gbp, quietDays } from "@/lib/format";
+import { ageClass, fmtAge, gbp, isClosed, quietDays } from "@/lib/format";
 import {
-  ALL,
-  NONE,
   NO_FILTERS,
   TOUCH_PRESETS,
   activeFilterCount,
@@ -16,11 +14,11 @@ import {
   touchRange,
   writeFilters,
   type DealFilters,
-  type FilterOption,
   type TouchPreset,
 } from "@/lib/dealFilters";
 import { BUSINESS_SEGMENTS, CLIENT_TYPES, LEAD_SOURCES } from "@/lib/sources";
 import type { Deal, Stage } from "@/lib/types";
+import FilterSelect from "@/components/FilterSelect";
 import DealDrawer, { type CurrentUser } from "./DealDrawer";
 import AddDealForm from "./AddDealForm";
 
@@ -62,6 +60,8 @@ export default function PipelineBoard({
   const [filters, setFilters] = useState<DealFilters>(initialFilters);
   const [dragId, setDragId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(initialDealId);
+  // a card dropped on Lost opens its drawer at the lost-reason dialog
+  const [losingId, setLosingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const selectedDeal = deals.find((d) => d.id === selectedId) ?? null;
 
@@ -86,7 +86,7 @@ export default function PipelineBoard({
     const f = { ...filters, q: filters.q.trim() };
     const range = touchRange(f);
     return deals.filter((d) =>
-      matchesDeal(d, f, d.stage !== "won" && !withTask.has(d.id), range),
+      matchesDeal(d, f, !isClosed(d.stage) && !withTask.has(d.id), range),
     );
   }, [deals, filters, withTask]);
   const narrowed = activeFilterCount(filters) > 0 || !!filters.q.trim();
@@ -299,9 +299,14 @@ export default function PipelineBoard({
 
       <div className="kanban">
         {stages.map((s) => {
+          // biggest first; the Lost column reads newest-closed first
           const ds = filtered
             .filter((d) => d.stage === s.id)
-            .sort((a, b) => b.value - a.value);
+            .sort((a, b) =>
+              s.id === "lost"
+                ? (b.close_date ?? "").localeCompare(a.close_date ?? "")
+                : b.value - a.value,
+            );
           const sum = ds.reduce((a, d) => a + d.value, 0);
           return (
             <div
@@ -318,7 +323,13 @@ export default function PipelineBoard({
               }
               onDrop={(e) => {
                 (e.currentTarget as HTMLElement).classList.remove("dragover");
-                if (dragId) restage(dragId, s.id);
+                // losing needs a reason (it feeds the scorecard), so a drop
+                // on Lost opens the drawer's dialog instead of moving the card
+                const dropped = deals.find((d) => d.id === dragId);
+                if (dropped && s.id === "lost" && dropped.stage !== "lost") {
+                  setSelectedId(dropped.id);
+                  setLosingId(dropped.id);
+                } else if (dragId) restage(dragId, s.id);
                 setDragId(null);
               }}
             >
@@ -336,7 +347,7 @@ export default function PipelineBoard({
                 {ds.map((d) => {
                   const ac = ageClass(d);
                   const quiet = quietDays(d.last_touched_at);
-                  const noTask = d.stage !== "won" && !withTask.has(d.id);
+                  const noTask = !isClosed(d.stage) && !withTask.has(d.id);
                   return (
                     <div
                       key={d.id}
@@ -373,8 +384,8 @@ export default function PipelineBoard({
                       </div>
                       <div className="kfoot">
                         <span className={`kage ${ac}`}>
-                          {d.stage === "won"
-                            ? "won"
+                          {isClosed(d.stage)
+                            ? d.stage
                             : quiet >= 1
                               ? fmtAge(quiet) + " quiet"
                               : "active today"}
@@ -425,13 +436,17 @@ export default function PipelineBoard({
 
       {selectedDeal && (
         <DealDrawer
-          key={selectedDeal.id}
+          key={selectedDeal.id + (losingId === selectedDeal.id ? ":lost" : "")}
           deal={selectedDeal}
           stages={stages}
           owners={owners}
           assignees={assignees}
           currentUser={currentUser}
-          onClose={() => setSelectedId(null)}
+          startLost={losingId === selectedDeal.id}
+          onClose={() => {
+            setSelectedId(null);
+            setLosingId(null);
+          }}
           onChanged={(updated) =>
             setDeals((ds) =>
               ds.map((x) => (x.id === updated.id ? updated : x)),
@@ -444,50 +459,5 @@ export default function PipelineBoard({
         />
       )}
     </>
-  );
-}
-
-// One labelled field filter. A value from a shared link that no deal carries
-// any more still shows as chosen (with 0), rather than the select silently
-// falling back to "All" while the board stays filtered.
-function FilterSelect({
-  label,
-  all,
-  blank,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  all: string;
-  blank: string;
-  value: string;
-  options: FilterOption[];
-  onChange: (value: string) => void;
-}) {
-  const opts =
-    value === ALL || options.some((o) => o.value === value)
-      ? options
-      : [
-          ...options,
-          { value, label: value === NONE ? blank : value, count: 0 },
-        ];
-  return (
-    <label className="pf">
-      <span className="pf-l">{label}</span>
-      <select
-        className={`ownerfilter${value !== ALL ? " set" : ""}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={label}
-      >
-        <option value={ALL}>{all}</option>
-        {opts.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label} ({o.count})
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

@@ -2,10 +2,21 @@
 
 import { useMemo, useState } from "react";
 import type { Deal, Stage } from "@/lib/types";
+import { ALL, fieldIs, fieldOptions } from "@/lib/dealFilters";
+import { LEAD_SOURCES } from "@/lib/sources";
 import { fmtDay } from "@/components/ClientTag";
+import FilterSelect from "@/components/FilterSelect";
 import DealDrawer, { type CurrentUser } from "../pipeline/DealDrawer";
 
-type SortKey = "dealname" | "owner" | "client_type" | "lost_reason" | "close_date";
+type SortKey =
+  | "dealname"
+  | "owner"
+  | "source"
+  | "client_type"
+  | "lost_reason"
+  | "close_date";
+
+const NO_SOURCE = "No source";
 
 // the sortable text/date behind each column (nulls sort last either way)
 function sortValue(d: Deal, k: SortKey): string | null {
@@ -14,6 +25,8 @@ function sortValue(d: Deal, k: SortKey): string | null {
       return (d.dealname || d.company || "").toLowerCase();
     case "owner":
       return (d.owner_name || d.owner_code || "").toLowerCase() || null;
+    case "source":
+      return d.source?.toLowerCase() ?? null;
     case "client_type":
       return d.client_type?.toLowerCase() ?? null;
     case "lost_reason":
@@ -38,6 +51,12 @@ export default function LostTable({
 }) {
   const [deals, setDeals] = useState<Deal[]>(initial);
   const [q, setQ] = useState("");
+  // where lost deals came from (Oleksandr, Nov 2026)
+  const [source, setSource] = useState(ALL);
+  const sourceOptions = useMemo(
+    () => fieldOptions(deals, (d) => d.source, LEAD_SOURCES, NO_SOURCE),
+    [deals],
+  );
   // most recently closed first — the question is usually "what did we just lose?"
   const [sortKey, setSortKey] = useState<SortKey>("close_date");
   const [asc, setAsc] = useState(false);
@@ -46,13 +65,15 @@ export default function LostTable({
 
   const rows = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const bySource = deals.filter((d) => fieldIs(d.source, source));
     const filtered = term
-      ? deals.filter((d) =>
+      ? bySource.filter((d) =>
           [
             d.company,
             d.dealname,
             d.owner_code,
             d.owner_name,
+            d.source,
             d.client_type,
             d.lost_reason,
           ]
@@ -60,7 +81,7 @@ export default function LostTable({
             .toLowerCase()
             .includes(term),
         )
-      : deals;
+      : bySource;
     return [...filtered].sort((a, b) => {
       const va = sortValue(a, sortKey);
       const vb = sortValue(b, sortKey);
@@ -70,7 +91,7 @@ export default function LostTable({
       const cmp = va < vb ? -1 : 1;
       return asc ? cmp : -cmp;
     });
-  }, [deals, q, sortKey, asc]);
+  }, [deals, q, source, sortKey, asc]);
 
   function sortBy(k: SortKey) {
     if (k === sortKey) setAsc((v) => !v);
@@ -91,8 +112,28 @@ export default function LostTable({
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search lost deals, companies, owners, client types"
+          placeholder="Search lost deals, companies, owners, sources, client types"
         />
+      </div>
+      <div className="pfilters" role="group" aria-label="Filter lost deals">
+        <FilterSelect
+          label="Lead source"
+          all="All sources"
+          value={source}
+          options={sourceOptions}
+          blank={NO_SOURCE}
+          onChange={setSource}
+        />
+        {source !== ALL && (
+          <span className="pf-summary">
+            <span className="lf-note" style={{ margin: 0 }}>
+              Showing {rows.length} of {deals.length} lost deals
+            </span>
+            <button className="filterbtn" onClick={() => setSource(ALL)}>
+              Clear
+            </button>
+          </span>
+        )}
       </div>
       <div className="panel" style={{ overflowX: "auto" }}>
         <table>
@@ -100,6 +141,7 @@ export default function LostTable({
             <tr>
               <th onClick={() => sortBy("dealname")}>Deal{arrow("dealname")}</th>
               <th onClick={() => sortBy("owner")}>Owner{arrow("owner")}</th>
+              <th onClick={() => sortBy("source")}>Source{arrow("source")}</th>
               <th onClick={() => sortBy("client_type")}>
                 Client type{arrow("client_type")}
               </th>
@@ -120,6 +162,7 @@ export default function LostTable({
               >
                 <td>{d.dealname || d.company}</td>
                 <td>{d.owner_name || d.owner_code || "—"}</td>
+                <td>{d.source || "—"}</td>
                 <td>{d.client_type || "Unassigned"}</td>
                 <td>{d.lost_reason || "—"}</td>
                 <td title={d.close_date ?? undefined}>{fmtDay(d.close_date)}</td>

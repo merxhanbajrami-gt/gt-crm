@@ -134,7 +134,7 @@ export function activeFilterCount(f: DealFilters): number {
   ].filter(Boolean).length;
 }
 
-const fieldIs = (value: string | null, want: string) =>
+export const fieldIs = (value: string | null, want: string) =>
   want === ALL || (want === NONE ? !value : value === want);
 
 // `noTask`: the deal is open and has no active task — the board's "no task"

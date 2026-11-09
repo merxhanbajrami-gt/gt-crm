@@ -60,6 +60,7 @@ export default function DealDrawer({
   onClose,
   onChanged,
   onDeleted,
+  startLost = false,
 }: {
   deal: Deal;
   stages: Stage[];
@@ -70,6 +71,8 @@ export default function DealDrawer({
   onClose: () => void;
   onChanged: (d: Deal) => void;
   onDeleted: (id: string) => void;
+  // open at the "why did we lose it?" dialog (a card dropped on Lost)
+  startLost?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -105,7 +108,7 @@ export default function DealDrawer({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   // mark-lost dialog
-  const [lostModal, setLostModal] = useState(false);
+  const [lostModal, setLostModal] = useState(startLost);
   const [lostReason, setLostReason] = useState("");
   const [lostDetail, setLostDetail] = useState("");
   // task editing

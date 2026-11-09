@@ -83,9 +83,53 @@ test.describe("Pipeline", () => {
     await expect(
       page.getByRole("heading", { name: /where every lead stands/i }),
     ).toBeVisible();
-    // active flow columns render (Lost lives under its own tab, not here)
-    await expect(page.getByText("Connection")).toBeVisible();
-    await expect(page.getByText("Won")).toBeVisible();
+    // every stage is a column, Lost right of Won (Oleksandr, Nov 2026)
+    const order = await page
+      .locator(".kanban .kcol")
+      .evaluateAll((cols) => cols.map((c) => c.getAttribute("data-stage")));
+    expect(order).toEqual([
+      "connection",
+      "pursue",
+      "attack",
+      "close",
+      "won",
+      "lost",
+    ]);
+  });
+
+  test.describe("lost column", () => {
+    const dropCo = `${TEST_DEAL_PREFIX} Drop To Lost Co`;
+
+    test.beforeAll(async () => {
+      const admin = adminClient();
+      const { error } = await admin
+        .from("deals")
+        .insert({ company: dropCo, stage: "connection", owner_code: "E2E" });
+      if (error) throw error;
+      // wiped by the global afterAll
+    });
+
+    test("a card dropped on Lost asks why before it moves", async ({
+      page,
+    }) => {
+      await page.goto("/pipeline");
+      const card = page.locator(".kcard", { hasText: dropCo });
+      await card.dragTo(page.locator('.kcol[data-stage="lost"]'));
+      await expect(
+        page.getByRole("dialog", { name: "Mark lost" }),
+      ).toBeVisible();
+      // cancelling leaves the deal where it was
+      await page
+        .getByRole("dialog", { name: "Mark lost" })
+        .getByRole("button", { name: "Cancel" })
+        .click();
+      await page.getByRole("button", { name: "Close" }).click();
+      await expect(
+        page.locator('.kcol[data-stage="connection"] .kcard', {
+          hasText: dropCo,
+        }),
+      ).toBeVisible();
+    });
   });
 
   test.describe("filters", () => {
@@ -184,6 +228,37 @@ test.describe("Contacts", () => {
 });
 
 test.describe("Lost", () => {
+  const lostEvent = `${TEST_DEAL_PREFIX} Lost Event Co`;
+  const lostPartner = `${TEST_DEAL_PREFIX} Lost Partner Co`;
+
+  test.beforeAll(async () => {
+    const admin = adminClient();
+    const { error } = await admin.from("deals").insert([
+      { company: lostEvent, stage: "lost", owner_code: "E2E", source: "Event" },
+      {
+        company: lostPartner,
+        stage: "lost",
+        owner_code: "E2E",
+        source: "Partner",
+      },
+    ]);
+    if (error) throw error;
+    // wiped by the global afterAll
+  });
+
+  test("lead source filter narrows the lost deals", async ({ page }) => {
+    await page.goto("/lost");
+    await expect(page.getByRole("cell", { name: lostEvent })).toBeVisible();
+    await expect(page.getByRole("cell", { name: lostPartner })).toBeVisible();
+
+    await page.getByLabel("Lead source").selectOption("Event");
+    await expect(page.getByRole("cell", { name: lostEvent })).toBeVisible();
+    await expect(page.getByRole("cell", { name: lostPartner })).not.toBeVisible();
+
+    await page.getByRole("button", { name: "Clear" }).click();
+    await expect(page.getByRole("cell", { name: lostPartner })).toBeVisible();
+  });
+
   test("table sorts by closed date", async ({ page }) => {
     await page.goto("/lost");
     await expect(
