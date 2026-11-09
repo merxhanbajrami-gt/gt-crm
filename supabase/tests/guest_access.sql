@@ -1,4 +1,4 @@
--- RLS checks for guest access (0020). Everything runs in one transaction that
+-- RLS checks for guest access (0020, 0021). Everything runs in one transaction that
 -- rolls back, so this is safe to run against the live database:
 --
 --   scripts/db.sh -f supabase/tests/guest_access.sql
@@ -44,6 +44,11 @@ from public.contacts c
 where c.deal_id is distinct from :'shared_deal'
 limit 1 \gset
 
+select c.id as shared_contact
+from public.contacts c
+where c.deal_id = :'shared_deal'
+limit 1 \gset
+
 -- what the guest should see
 select
   (select count(*) from public.contacts where deal_id = :'shared_deal') as want_contacts,
@@ -65,6 +70,7 @@ select
   set_config('t.hidden_deal',    :'hidden_deal',    true),
   set_config('t.hidden_company', :'hidden_company', true),
   set_config('t.hidden_contact', :'hidden_contact', true),
+  set_config('t.shared_contact', :'shared_contact', true),
   set_config('t.want_contacts',  :'want_contacts',  true),
   set_config('t.want_actions',   :'want_actions',   true),
   set_config('t.all_deals',      :'all_deals',      true),
@@ -87,6 +93,8 @@ declare
   hidden_deal    uuid := current_setting('t.hidden_deal')::uuid;
   hidden_company uuid := current_setting('t.hidden_company')::uuid;
   hidden_contact uuid := current_setting('t.hidden_contact')::uuid;
+  shared_contact uuid := current_setting('t.shared_contact')::uuid;
+  admin          uuid := current_setting('t.admin')::uuid;
   n bigint;
 begin
   -- reads
@@ -174,8 +182,25 @@ begin
   exception when insufficient_privilege then null;
   end;
 
-  -- contact writes
-  insert into public.contacts (deal_id, name) values (shared_deal, 'Guest test');
+  -- contact writes: the owner comes from the deal, as the drawer sends it
+  insert into public.contacts (deal_id, name, owner_code, owner_id)
+  select id, 'Guest test', owner_code, owner_id
+  from public.deals where id = shared_deal;
+
+  begin
+    insert into public.contacts (deal_id, name, owner_code)
+    values (shared_deal, 'Guest test', 'NOT-THE-OWNER');
+    raise exception 'guest added a contact under another owner';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.contacts (deal_id, name, owner_code, owner_id, company_id)
+    select id, 'Guest test', owner_code, owner_id, hidden_company
+    from public.deals where id = shared_deal;
+    raise exception 'guest added a contact to a hidden company';
+  exception when insufficient_privilege then null;
+  end;
 
   begin
     insert into public.contacts (deal_id, name) values (hidden_deal, 'Guest test');
@@ -256,6 +281,59 @@ begin
     insert into public.actions (deal_id, owner_code, kind, note)
     values (shared_deal, 'OK', 'note', 'not mine');
     raise exception 'guest wrote a note in someone else''s name';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.actions (deal_id, owner_id, owner_code, kind, note)
+    values (shared_deal, guest, 'OK', 'note', 'signed as OK');
+    raise exception 'guest put another rep code on its note';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.actions (deal_id, owner_id, created_by, kind, note)
+    values (shared_deal, admin, guest, 'note', 'as the admin');
+    raise exception 'guest wrote a note with the admin as owner';
+  exception when insufficient_privilege then null;
+  end;
+
+  -- every reference on a guest's note must be shared, not just one
+  insert into public.actions (contact_id, owner_id, kind, note)
+  values (shared_contact, guest, 'note', 'guest contact note');
+
+  begin
+    insert into public.actions (deal_id, contact_id, owner_id, kind, note)
+    values (shared_deal, hidden_contact, guest, 'note', 'onto a hidden contact');
+    raise exception 'guest tagged a hidden contact on its note';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.actions (deal_id, company_id, owner_id, kind, note)
+    values (shared_deal, hidden_company, guest, 'note', 'onto a hidden company');
+    raise exception 'guest tagged a hidden company on its note';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.actions (deal_id, contact_id, owner_id, kind, note)
+    values (hidden_deal, shared_contact, guest, 'note', 'onto a hidden deal');
+    raise exception 'guest tagged a hidden deal on its note';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.actions (owner_id, kind, note)
+    values (guest, 'note', 'on nothing');
+    raise exception 'guest wrote a note on no record';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.actions set contact_id = hidden_contact
+    where deal_id = shared_deal and owner_id = guest;
+    raise exception 'guest moved its note onto a hidden contact';
   exception when insufficient_privilege then null;
   end;
 

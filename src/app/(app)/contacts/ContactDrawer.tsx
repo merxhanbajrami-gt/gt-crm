@@ -139,7 +139,9 @@ export default function ContactDrawer({
     setBusy(true);
     const { error } = await supabase.from("actions").insert({
       contact_id: c.id,
-      company_id: c.company_id,
+      // a guest may only tag a company it can see (0021); a hidden one
+      // never loads its name
+      company_id: isGuest(currentUser.role) && !companyName ? null : c.company_id,
       kind: "note",
       note: text,
       owner_id: currentUser.id,
